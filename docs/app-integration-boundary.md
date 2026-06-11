@@ -28,6 +28,8 @@ https://github.com/Yrd980/LCSC_android_erp.git
 - 固件行为约束和错误码。
 - 模拟器或测试夹具，帮助 APP 在硬件未回板前联调。
 
+APP 开发者优先阅读：[Android BLE 接入指南](android-ble-integration-guide.md)。
+
 ## APP 仓库需要实现的对接点
 
 - 扫描 `VBRK-XXXX` 设备并解析厂商字段。

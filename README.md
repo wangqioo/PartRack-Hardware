@@ -33,6 +33,8 @@ v1.5/v2 见 [docs/roadmap.md](docs/roadmap.md)。
 
 当前开发板 bring-up 资料见 [docs/xiao-nrf52840-bringup.md](docs/xiao-nrf52840-bringup.md)。
 
+Android APP 对接指南见 [docs/android-ble-integration-guide.md](docs/android-ble-integration-guide.md)。
+
 ## 目录
 
 ```text
