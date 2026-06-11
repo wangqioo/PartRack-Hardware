@@ -6,6 +6,7 @@
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/led_strip.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -20,10 +21,16 @@ static const struct gpio_dt_spec led_data_gpio = GPIO_DT_SPEC_GET(DT_ALIAS(vbrk_
 static const struct gpio_dt_spec led_power_gpio = GPIO_DT_SPEC_GET(DT_ALIAS(vbrk_led_power), gpios);
 #endif
 
+#if DT_HAS_ALIAS(vbrk_led_strip)
+static const struct device *const led_strip = DEVICE_DT_GET(DT_ALIAS(vbrk_led_strip));
+static struct led_rgb strip_pixels[VBRK_SLOT_COUNT];
+#endif
+
 static struct k_work_delayable off_work;
 static uint8_t active_mode;
 static int64_t expires_at_ms;
 static vbrk_light_frame_t active_frame;
+static vbrk_rgb_t active_pixels[VBRK_SLOT_COUNT];
 
 static int configure_light_outputs(void)
 {
@@ -46,6 +53,20 @@ static int configure_light_outputs(void)
 #endif
 }
 
+static int configure_led_strip(void)
+{
+#if DT_HAS_ALIAS(vbrk_led_strip)
+    if (!device_is_ready(led_strip)) {
+        return -ENODEV;
+    }
+    LOG_INF("WS2812 LED strip backend ready");
+    return 0;
+#else
+    LOG_INF("WS2812 LED strip backend not configured");
+    return 0;
+#endif
+}
+
 static void set_light_outputs(bool power_on)
 {
 #if DT_HAS_ALIAS(vbrk_led_data) && DT_HAS_ALIAS(vbrk_led_power)
@@ -56,9 +77,33 @@ static void set_light_outputs(bool power_on)
 #endif
 }
 
+static void show_active_pixels(uint8_t active_slots)
+{
+    ARG_UNUSED(active_slots);
+
+#if DT_HAS_ALIAS(vbrk_led_strip)
+    int err;
+
+    for (uint8_t i = 0; i < VBRK_SLOT_COUNT; i++) {
+        strip_pixels[i].r = active_pixels[i].r;
+        strip_pixels[i].g = active_pixels[i].g;
+        strip_pixels[i].b = active_pixels[i].b;
+    }
+
+    err = led_strip_update_rgb(led_strip, strip_pixels, VBRK_SLOT_COUNT);
+    if (err != 0) {
+        LOG_WRN("LED strip update failed: %d", err);
+    }
+#endif
+}
+
 static void drive_leds_off(void)
 {
+    uint8_t active_slots = 0;
+
     memset(&active_frame, 0, sizeof(active_frame));
+    memset(active_pixels, 0, sizeof(active_pixels));
+    show_active_pixels(active_slots);
     set_light_outputs(false);
     LOG_INF("light off");
 }
@@ -74,19 +119,15 @@ static void drive_leds_command(const vbrk_light_command_t *command)
         return;
     }
 
-    for (uint8_t i = 0; i < VBRK_SLOT_COUNT; i++) {
-        const vbrk_rgb_t *rgb = &active_frame.slots[i];
-
-        if (rgb->r != 0 || rgb->g != 0 || rgb->b != 0) {
-            active_slots++;
-        }
+    err = vbrk_light_frame_copy_pixels(&active_frame, active_pixels,
+                                       VBRK_SLOT_COUNT, &active_slots);
+    if (err != 0) {
+        LOG_WRN("light frame pixel copy failed: %d", err);
+        return;
     }
 
     set_light_outputs(true);
-    /*
-     * TODO: implement WS2812 output with PWM + EasyDMA.
-     * mask_a/mask_b and RGB colors are already in the protocol frame.
-     */
+    show_active_pixels(active_slots);
     LOG_INF("light mode=%u active_slots=%u mask_a=0x%08x mask_b=0x%08x",
             command->mode, active_slots, command->mask_a_le, command->mask_b_le);
 }
@@ -108,6 +149,10 @@ int light_control_init(void)
     int err;
 
     err = configure_light_outputs();
+    if (err != 0) {
+        return err;
+    }
+    err = configure_led_strip();
     if (err != 0) {
         return err;
     }

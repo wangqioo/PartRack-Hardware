@@ -45,12 +45,16 @@
   - `color_b` 会覆盖同槽位的 `color_a`，用于表达更高优先级。
   - 超出 25 槽的 mask bit 会忽略。
   - 已加入 host-side light frame 单测。
+- 已接入灯控像素输出后端入口：
+  - `vbrk_light_frame_copy_pixels()` 会把 25 槽 RGB frame 转为输出像素数组，并统计 active slot 数。
+  - 固件已有可选 Zephyr `led_strip` 输出路径：存在 `vbrk-led-strip` devicetree alias 时调用 `led_strip_update_rgb()`。
+  - 当前 XIAO overlay 尚未声明真实 WS2812 strip 设备，因此默认仍只做 D3/P0.29 电源门控和日志输出。
 
 当前仍未完成：
 
 - Binding Table 的 `WRITE_ONE -> READ_ONE` 还需要完整 notify 闭环验证。
 - Binding Table 持久化固件已烧录到 XIAO nRF52840 Sense，仍需做“写入 -> 重启 -> 读回”的手机实机确认。
-- 灯控已有 GATT 接口、状态框架、电源门控和 25 槽 RGB 帧生成，还没有真实 WS2812 数据输出。
+- 灯控已有 GATT 接口、状态框架、电源门控、25 槽 RGB 帧生成和 Zephyr `led_strip` 可选后端入口，还没有完成 XIAO 上的真实 WS2812 DTS/引脚绑定。
 - NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
 
 下一步优先级：
@@ -58,9 +62,10 @@
 1. 使用手机 nRF Connect 手工验证 Binding Table 持久化：写入槽位、重启、再次连接读回。
 2. 烧录灯条电源门控固件，验证 D3/P0.29 会随灯控命令拉高/拉低。
 3. 在可访问本机蓝牙栈的环境中运行 `tools/ble_gatt_smoke_test.py --run-smoke`，完成 Binding Table 真实设备读写闭环验证。
-4. 接入 WS2812 PWM + EasyDMA 数据输出。
-5. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
-6. 回到 nRF52832 目标资源预算和硬件约束验证。
+4. 为 XIAO nRF52840 Sense 增加 WS2812 `led_strip` devicetree 绑定，优先复用 Zephyr 官方 WS2812 SPI/I2S 驱动并确认 D2/P0.28 引脚可路由性。
+5. 接真实 25 颗 WS2812 灯条，验证 `FIND/PICK/SORT/STOCK_IN/OFF` 的颜色、槽位和超时熄灯。
+6. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
+7. 回到 nRF52832 目标资源预算和硬件约束验证。
 
 ## 阶段 0：协议冻结
 
@@ -103,11 +108,13 @@
 - 灯控模式调度和超时熄灯框架。
 - 灯条电源门控：D3/P0.29 高电平上电，OFF/超时断电；D2/P0.28 保持低电平。
 - 灯控 RGB 帧生成：`mask_a/mask_b` -> 25 槽 RGB buffer，`color_b` 覆盖 `color_a`。
+- 灯控像素输出入口：frame -> 25 槽 RGB pixels -> 可选 Zephyr `led_strip_update_rgb()`。
 - NFC FD GPIO 唤醒入口。
 - settings/NVS 绑定表持久化初版。
 - 绑定表 snapshot 编码、CRC 校验和损坏数据拒绝测试。
 - 灯控策略 host-side 测试：默认 30s、最大 300s、FX 最大 10s、OFF 断电、非法 mode 拒绝。
 - 灯控帧 host-side 测试：OFF 清空、A/B mask 着色、B 覆盖 A、越界 bit 忽略。
+- 灯控像素 host-side 测试：frame copy、active slot 统计、非法参数和 buffer 长度拒绝。
 
 已完成实机验证：
 
@@ -130,7 +137,7 @@
 待开发：
 
 - 扩展 BLE/GATT 烟测覆盖 `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET`。
-- 接入 WS2812 PWM + EasyDMA 数据输出。
+- 为 XIAO nRF52840 Sense 接入真实 WS2812 DTS/引脚绑定，并验证 Zephyr `led_strip` 驱动输出。
 - 再回到 `nrf52dk_nrf52832` 做目标芯片资源、引脚和功耗验证。
 - 修正编译期 API/配置问题。
 - 接入电池 ADC。
@@ -150,12 +157,13 @@
 - 开发期 P-MOS 电源门控：D3/P0.29 高电平导通。
 - DATA 断电期间保持低电平：D2/P0.28 输出低电平。
 - 25 槽 RGB 帧生成：固件收到灯控命令后会构建 frame 并记录 active slot 数。
+- Zephyr `led_strip` 输出后端入口：DTS 中定义 `vbrk-led-strip` 后，固件会把 25 槽 RGB pixels 交给 `led_strip_update_rgb()`。
 
 待办：
 
-- 确认 WS2812 DATA 引脚映射。
-- 实现 PWM + EasyDMA 编码。
-- 将 25 槽 RGB frame 编码并输出到真实 WS2812 灯条。
+- 确认 XIAO 上 WS2812 DATA 引脚映射和外部接线方式。
+- 在 devicetree 中声明真实 WS2812 strip。优先评估 Zephyr 官方 `worldsemi,ws2812-spi` 或 `worldsemi,ws2812-i2s`，若不能满足 nRF52832 目标硬件再回退自研 PWM + EasyDMA。
+- 将 25 槽 RGB frame 输出到真实 WS2812 灯条。
 - 测试 3.7V 灯条亮度和一致性。
 - 测试静态断电电流。
 

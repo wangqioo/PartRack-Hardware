@@ -35,3 +35,30 @@ int vbrk_light_frame_build(const vbrk_light_command_t *command,
 
     return 0;
 }
+
+int vbrk_light_frame_copy_pixels(const vbrk_light_frame_t *frame,
+                                 vbrk_rgb_t *pixels,
+                                 size_t pixel_count,
+                                 uint8_t *active_slots)
+{
+    uint8_t active = 0;
+
+    if (frame == NULL || pixels == NULL) {
+        return -EINVAL;
+    }
+    if (pixel_count < VBRK_SLOT_COUNT) {
+        return -ENOSPC;
+    }
+
+    for (uint8_t i = 0; i < VBRK_SLOT_COUNT; i++) {
+        pixels[i] = frame->slots[i];
+        if (pixels[i].r != 0 || pixels[i].g != 0 || pixels[i].b != 0) {
+            active++;
+        }
+    }
+
+    if (active_slots != NULL) {
+        *active_slots = active;
+    }
+    return 0;
+}

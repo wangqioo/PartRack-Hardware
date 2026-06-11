@@ -36,6 +36,8 @@ firmware/nrf52/app
 - 25 槽绑定表内存模型。
 - `READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`、`FACTORY_RESET`。
 - 灯控 `OFF` 和模式调度框架。
+- 绑定表 settings/NVS 持久化初版。
+- 灯控 25 槽 RGB 帧生成、D3/P0.29 电源门控和可选 Zephyr `led_strip` 输出入口。
 - NFC FD GPIO 唤醒入口。
 
 ## 当前开发板
@@ -58,9 +60,8 @@ NT3H2111 I2C SCL  -> D5 / P0.05
 
 待接真实硬件：
 
-- 绑定表 settings/NVS 持久化。
-- WS2812 PWM + EasyDMA 输出。
-- P-MOS 灯条电源门控。
+- 绑定表“写入 -> 重启 -> 读回”实机确认。
+- WS2812 真实输出 DTS/引脚绑定和灯条验证。
 - NT3H2111 I2C/NDEF 写入。
 - 电池电量 ADC。
 - MCUboot/DFU。
