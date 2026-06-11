@@ -37,7 +37,7 @@ firmware/nrf52/app
 - `READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`、`FACTORY_RESET`。
 - 灯控 `OFF` 和模式调度框架。
 - 绑定表 settings/NVS 持久化初版。
-- 灯控 25 槽 RGB 帧生成、D3/P0.29 电源门控和可选 Zephyr `led_strip` 输出入口。
+- 灯控 25 槽 RGB 帧生成、D3/P0.29 电源门控和 Zephyr `worldsemi,ws2812-spi` 输出绑定。
 - NFC FD GPIO 唤醒入口。
 
 ## 当前开发板
@@ -56,12 +56,19 @@ NT3H2111 I2C SDA  -> D4 / P0.04
 NT3H2111 I2C SCL  -> D5 / P0.05
 ```
 
+当前 XIAO 开发固件使用 `worldsemi,ws2812-spi`：
+
+- D2 / P0.28 被路由为 SPI2 MOSI，只接 WS2812 DIN。
+- D3 / P0.29 控制灯条电源门。
+- WS2812 配置为 25 pixels、GRB 顺序、4 MHz SPI。
+- 若构建 `xiao_ble/nrf52840/sense`，Zephyr 会加载 `boards/xiao_ble_nrf52840_sense.overlay`。
+
 这些映射只用于开发板 bring-up。首版目标主控仍是 nRF52832，回到目标硬件时需要重新确认引脚、功耗和 Flash/RAM 余量。
 
 待接真实硬件：
 
 - 绑定表“写入 -> 重启 -> 读回”实机确认。
-- WS2812 真实输出 DTS/引脚绑定和灯条验证。
+- WS2812 真实灯条输出验证。
 - NT3H2111 I2C/NDEF 写入。
 - 电池电量 ADC。
 - MCUboot/DFU。

@@ -58,13 +58,26 @@ west build -b nrf52dk_nrf52832 firmware/nrf52/app
 
 | PartRack 信号 | XIAO 引脚 | nRF52840 引脚 | 说明 |
 |---|---:|---|---|
-| WS2812 DATA | D2 | P0.28 | 后续接 PWM + EasyDMA 输出。 |
+| WS2812 DATA | D2 | P0.28 | 当前通过 Zephyr `worldsemi,ws2812-spi` 绑定为 SPI2 MOSI 输出。 |
 | 灯条 P-MOS 控制 | D3 | P0.29 | 高电平导通，开发期约定。 |
 | NFC FD 模拟输入 | D0 | P0.02 | 用按钮、跳线或 NT3H2111 FD 信号触发快速广播。 |
 | NT3H2111 SDA | D4 | P0.04 | XIAO 默认 I2C SDA。 |
 | NT3H2111 SCL | D5 | P0.05 | XIAO 默认 I2C SCL。 |
 
-当前 overlay: `firmware/nrf52/app/boards/xiao_ble.overlay`。Zephyr 会在 `xiao_ble/nrf52840/sense` 构建中加载 `xiao_ble_nrf52840_sense.dts`，再叠加本项目的开发期引脚映射。
+当前 overlay:
+
+- `firmware/nrf52/app/boards/xiao_ble_nrf52840_sense.overlay`
+- `firmware/nrf52/app/boards/xiao_ble.overlay`
+- 共享映射：`firmware/nrf52/app/boards/xiao_ble_part_rack.dtsi`
+
+Zephyr 会在 `xiao_ble/nrf52840/sense` 构建中加载 `xiao_ble_nrf52840_sense.dts`，再叠加本项目的开发期引脚映射。
+
+WS2812 开发期接线：
+
+- XIAO D2 / P0.28 -> WS2812 DIN。
+- XIAO D3 / P0.29 -> 灯条 P-MOS 电源控制。
+- XIAO GND -> 灯条 GND，必须共地。
+- 灯条供电按硬件电源路径接入，不直接用 GPIO 供电。
 
 ## XIAO 常用引脚表
 

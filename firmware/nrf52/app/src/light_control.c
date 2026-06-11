@@ -16,8 +16,11 @@
 
 LOG_MODULE_REGISTER(light_control, LOG_LEVEL_INF);
 
-#if DT_HAS_ALIAS(vbrk_led_data) && DT_HAS_ALIAS(vbrk_led_power)
+#if DT_HAS_ALIAS(vbrk_led_data)
 static const struct gpio_dt_spec led_data_gpio = GPIO_DT_SPEC_GET(DT_ALIAS(vbrk_led_data), gpios);
+#endif
+
+#if DT_HAS_ALIAS(vbrk_led_power)
 static const struct gpio_dt_spec led_power_gpio = GPIO_DT_SPEC_GET(DT_ALIAS(vbrk_led_power), gpios);
 #endif
 
@@ -34,21 +37,26 @@ static vbrk_rgb_t active_pixels[VBRK_SLOT_COUNT];
 
 static int configure_light_outputs(void)
 {
-#if DT_HAS_ALIAS(vbrk_led_data) && DT_HAS_ALIAS(vbrk_led_power)
-    int err;
-
-    if (!gpio_is_ready_dt(&led_data_gpio) || !gpio_is_ready_dt(&led_power_gpio)) {
+#if DT_HAS_ALIAS(vbrk_led_power)
+    if (!gpio_is_ready_dt(&led_power_gpio)) {
         return -ENODEV;
     }
 
+#if DT_HAS_ALIAS(vbrk_led_data)
+    int err;
+
+    if (!gpio_is_ready_dt(&led_data_gpio)) {
+        return -ENODEV;
+    }
     err = gpio_pin_configure_dt(&led_data_gpio, GPIO_OUTPUT_INACTIVE);
     if (err != 0) {
         return err;
     }
+#endif
 
     return gpio_pin_configure_dt(&led_power_gpio, GPIO_OUTPUT_INACTIVE);
 #else
-    LOG_WRN("vbrk-led-data or vbrk-led-power devicetree alias not defined");
+    LOG_WRN("vbrk-led-power devicetree alias not defined");
     return -ENODEV;
 #endif
 }
@@ -69,8 +77,10 @@ static int configure_led_strip(void)
 
 static void set_light_outputs(bool power_on)
 {
-#if DT_HAS_ALIAS(vbrk_led_data) && DT_HAS_ALIAS(vbrk_led_power)
+#if DT_HAS_ALIAS(vbrk_led_data)
     (void)gpio_pin_set_dt(&led_data_gpio, 0);
+#endif
+#if DT_HAS_ALIAS(vbrk_led_power)
     (void)gpio_pin_set_dt(&led_power_gpio, power_on ? 1 : 0);
 #else
     ARG_UNUSED(power_on);

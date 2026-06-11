@@ -1,0 +1,67 @@
+#include <zephyr/dt-bindings/led/led.h>
+#include <zephyr/dt-bindings/pinctrl/nrf-pinctrl.h>
+
+&pinctrl {
+    vbrk_spi2_ws2812_default: vbrk_spi2_ws2812_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 1, 13)>,
+                    <NRF_PSEL(SPIM_MOSI, 0, 28)>,
+                    <NRF_PSEL(SPIM_MISO, 1, 14)>;
+        };
+    };
+
+    vbrk_spi2_ws2812_sleep: vbrk_spi2_ws2812_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 1, 13)>,
+                    <NRF_PSEL(SPIM_MOSI, 0, 28)>,
+                    <NRF_PSEL(SPIM_MISO, 1, 14)>;
+            low-power-enable;
+        };
+    };
+};
+
+&spi2 {
+    compatible = "nordic,nrf-spim";
+    status = "okay";
+    pinctrl-0 = <&vbrk_spi2_ws2812_default>;
+    pinctrl-1 = <&vbrk_spi2_ws2812_sleep>;
+    pinctrl-names = "default", "sleep";
+
+    vbrk_ws2812: ws2812@0 {
+        compatible = "worldsemi,ws2812-spi";
+        reg = <0>;
+        spi-max-frequency = <4000000>;
+        chain-length = <25>;
+        color-mapping = <LED_COLOR_ID_GREEN
+                         LED_COLOR_ID_RED
+                         LED_COLOR_ID_BLUE>;
+        spi-one-frame = <0x70>;
+        spi-zero-frame = <0x40>;
+        reset-delay = <80>;
+    };
+};
+
+/ {
+    vbrk_outputs {
+        compatible = "gpio-leds";
+
+        vbrk_led_power: led_power {
+            gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>; /* XIAO D3 */
+        };
+    };
+
+    vbrk_inputs {
+        compatible = "gpio-keys";
+
+        vbrk_nfc_fd: nfc_fd {
+            gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>; /* XIAO D0 */
+        };
+    };
+
+    aliases {
+        vbrk-led-power = &vbrk_led_power;
+        vbrk-led-strip = &vbrk_ws2812;
+        led-strip = &vbrk_ws2812;
+        vbrk-nfc-fd = &vbrk_nfc_fd;
+    };
+};
