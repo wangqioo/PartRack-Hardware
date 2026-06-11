@@ -2,39 +2,66 @@
 
 #include <errno.h>
 
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
 #include "app_ble.h"
+#include "viberack_light_policy.h"
 
 LOG_MODULE_REGISTER(light_control, LOG_LEVEL_INF);
+
+#if DT_HAS_ALIAS(vbrk_led_data) && DT_HAS_ALIAS(vbrk_led_power)
+static const struct gpio_dt_spec led_data_gpio = GPIO_DT_SPEC_GET(DT_ALIAS(vbrk_led_data), gpios);
+static const struct gpio_dt_spec led_power_gpio = GPIO_DT_SPEC_GET(DT_ALIAS(vbrk_led_power), gpios);
+#endif
 
 static struct k_work_delayable off_work;
 static uint8_t active_mode;
 static int64_t expires_at_ms;
 
-static uint16_t command_timeout_s(const vbrk_light_command_t *command)
+static int configure_light_outputs(void)
 {
-    uint16_t timeout = command->timeout_s_le;
+#if DT_HAS_ALIAS(vbrk_led_data) && DT_HAS_ALIAS(vbrk_led_power)
+    int err;
 
-    if (timeout == 0) {
-        return 30;
-    }
-    if (timeout > 300) {
-        return 300;
+    if (!gpio_is_ready_dt(&led_data_gpio) || !gpio_is_ready_dt(&led_power_gpio)) {
+        return -ENODEV;
     }
 
-    return timeout;
+    err = gpio_pin_configure_dt(&led_data_gpio, GPIO_OUTPUT_INACTIVE);
+    if (err != 0) {
+        return err;
+    }
+
+    return gpio_pin_configure_dt(&led_power_gpio, GPIO_OUTPUT_INACTIVE);
+#else
+    LOG_WRN("vbrk-led-data or vbrk-led-power devicetree alias not defined");
+    return -ENODEV;
+#endif
+}
+
+static void set_light_outputs(bool power_on)
+{
+#if DT_HAS_ALIAS(vbrk_led_data) && DT_HAS_ALIAS(vbrk_led_power)
+    (void)gpio_pin_set_dt(&led_data_gpio, 0);
+    (void)gpio_pin_set_dt(&led_power_gpio, power_on ? 1 : 0);
+#else
+    ARG_UNUSED(power_on);
+#endif
 }
 
 static void drive_leds_off(void)
 {
-    /* TODO: disable PWM output, pull DATA low, then turn off LED P-MOS. */
+    set_light_outputs(false);
     LOG_INF("light off");
 }
 
 static void drive_leds_command(const vbrk_light_command_t *command)
 {
+    set_light_outputs(true);
     /*
      * TODO: implement WS2812 output with PWM + EasyDMA.
      * mask_a/mask_b and RGB colors are already in the protocol frame.
@@ -57,6 +84,13 @@ static void off_work_handler(struct k_work *work)
 
 int light_control_init(void)
 {
+    int err;
+
+    err = configure_light_outputs();
+    if (err != 0) {
+        return err;
+    }
+
     k_work_init_delayable(&off_work, off_work_handler);
     active_mode = VBRK_LIGHT_OFF;
     expires_at_ms = 0;
@@ -66,36 +100,29 @@ int light_control_init(void)
 
 int light_control_apply(const vbrk_light_command_t *command)
 {
-    uint16_t timeout_s;
+    vbrk_light_policy_t policy;
+    int err;
 
-    if (command == NULL) {
-        return -EINVAL;
-    }
-
-    if (command->mode > VBRK_LIGHT_FX) {
-        return -EINVAL;
+    err = vbrk_light_policy_resolve(command, &policy);
+    if (err != 0) {
+        return err;
     }
 
     k_work_cancel_delayable(&off_work);
 
-    if (command->mode == VBRK_LIGHT_OFF) {
+    if (!policy.power_on) {
         off_work_handler(NULL);
         return 0;
     }
 
-    timeout_s = command_timeout_s(command);
-    if (command->mode == VBRK_LIGHT_FX && timeout_s > 10) {
-        timeout_s = 10;
-    }
-
     drive_leds_command(command);
-    active_mode = command->mode;
-    expires_at_ms = k_uptime_get() + ((int64_t)timeout_s * MSEC_PER_SEC);
+    active_mode = policy.mode;
+    expires_at_ms = k_uptime_get() + ((int64_t)policy.timeout_s * MSEC_PER_SEC);
 
     app_ble_set_light_active(true);
-    app_ble_notify_light_status(active_mode, timeout_s);
+    app_ble_notify_light_status(active_mode, policy.timeout_s);
     app_ble_refresh_advertising();
-    k_work_schedule(&off_work, K_SECONDS(timeout_s));
+    k_work_schedule(&off_work, K_SECONDS(policy.timeout_s));
 
     return 0;
 }

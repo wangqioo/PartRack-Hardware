@@ -36,21 +36,26 @@
   - 固件启动时通过 Zephyr settings 读取 `vbrk/binding_table`。
   - 写入类操作会先保存到 flash，保存成功后才更新 RAM 和递增 `table_seq`。
   - 已加入 host-side snapshot 单测。
+- 已实现灯条电源门控初版：
+  - D3/P0.29 作为开发期 P-MOS 控制，非 OFF 灯控命令拉高，OFF/超时拉低。
+  - D2/P0.28 作为 WS2812 DATA，当前保持低电平，避免未实现数据输出时倒灌。
+  - 灯控 timeout/default/FX cap 逻辑已抽到 host-side 可测试策略模块。
 
 当前仍未完成：
 
 - Binding Table 的 `WRITE_ONE -> READ_ONE` 还需要完整 notify 闭环验证。
 - Binding Table 持久化固件已烧录到 XIAO nRF52840 Sense，仍需做“写入 -> 重启 -> 读回”的手机实机确认。
-- 灯控现在只有 GATT 接口和状态框架，还没有真实 WS2812 输出。
+- 灯控已有 GATT 接口、状态框架和电源门控，还没有真实 WS2812 数据输出。
 - NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
 
 下一步优先级：
 
 1. 使用手机 nRF Connect 手工验证 Binding Table 持久化：写入槽位、重启、再次连接读回。
-2. 在可访问本机蓝牙栈的环境中运行 `tools/ble_gatt_smoke_test.py --run-smoke`，完成 Binding Table 真实设备读写闭环验证。
-3. 接入 WS2812 PWM + EasyDMA 和 P-MOS 电源门控。
-4. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
-5. 回到 nRF52832 目标资源预算和硬件约束验证。
+2. 烧录灯条电源门控固件，验证 D3/P0.29 会随灯控命令拉高/拉低。
+3. 在可访问本机蓝牙栈的环境中运行 `tools/ble_gatt_smoke_test.py --run-smoke`，完成 Binding Table 真实设备读写闭环验证。
+4. 接入 WS2812 PWM + EasyDMA 数据输出。
+5. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
+6. 回到 nRF52832 目标资源预算和硬件约束验证。
 
 ## 阶段 0：协议冻结
 
@@ -91,9 +96,11 @@
 - 25 槽绑定表内存模型。
 - `READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`、`FACTORY_RESET`。
 - 灯控模式调度和超时熄灯框架。
+- 灯条电源门控：D3/P0.29 高电平上电，OFF/超时断电；D2/P0.28 保持低电平。
 - NFC FD GPIO 唤醒入口。
 - settings/NVS 绑定表持久化初版。
 - 绑定表 snapshot 编码、CRC 校验和损坏数据拒绝测试。
+- 灯控策略 host-side 测试：默认 30s、最大 300s、FX 最大 10s、OFF 断电、非法 mode 拒绝。
 
 已完成实机验证：
 
@@ -111,10 +118,12 @@
 - 真实 BLE 后端可用时，执行 `WRITE_ONE` 写入槽位后，通过 notify 和 `READ_ONE` 读回验证。
 - 真实 BLE 后端可用时，执行 `READ_ALL` 结束帧验证。
 - `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET` 的端到端验证。
+- 灯控命令实机验证：发送非 OFF 后 D3/P0.29 拉高，发送 OFF 或超时后拉低。
 
 待开发：
 
 - 扩展 BLE/GATT 烟测覆盖 `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET`。
+- 接入 WS2812 PWM + EasyDMA 数据输出。
 - 再回到 `nrf52dk_nrf52832` 做目标芯片资源、引脚和功耗验证。
 - 修正编译期 API/配置问题。
 - 接入电池 ADC。
@@ -129,12 +138,15 @@
 
 目标：完成 WS2812 实际输出和灯条整断电。
 
+已完成：
+
+- 开发期 P-MOS 电源门控：D3/P0.29 高电平导通。
+- DATA 断电期间保持低电平：D2/P0.28 输出低电平。
+
 待办：
 
 - 确认 WS2812 DATA 引脚映射。
 - 实现 PWM + EasyDMA 编码。
-- 实现 P-MOS 电源门控。
-- DATA 断电期间保持低电平，避免倒灌。
 - 实现 `FIND`、`PICK`、`SORT`、`STOCK_IN`、`OFF` 的真实灯效。
 - 测试 3.7V 灯条亮度和一致性。
 - 测试静态断电电流。
