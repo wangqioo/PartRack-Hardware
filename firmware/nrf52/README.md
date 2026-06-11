@@ -9,7 +9,7 @@
 - 低占空广播、快速广播、已连接、点灯中四态机。
 - NT3H2111 FD 引脚唤醒，使用 GPIOTE PORT 事件。
 - 绑定表持久化，使用 FDS 写穿。
-- 灯效输出使用 PWM + EasyDMA，禁止 GPIO bit-bang。
+- 灯效输出禁止 GPIO bit-bang。XIAO 开发板当前使用 Zephyr `worldsemi,ws2812-spi`；回到 nRF52832 目标硬件时再按引脚、功耗和资源复核 SPI/I2S/PWM 方案。
 - Secure DFU 双区 OTA。
 
 ## 推荐起点
@@ -95,6 +95,14 @@ west build -b nrf52dk_nrf52832 firmware/nrf52/app
 
 当前开发机的 NCS workspace 位于 `/Users/wq/ncs`，已完成 XIAO nRF52840 Sense 目标构建和 UF2 烧录验证。
 
+本机完整验证入口：
+
+```bash
+tools/verify_host.sh
+```
+
+该脚本会运行协议/模型/烟测向量测试、`git diff --check` 和 XIAO nRF52840 Sense Zephyr 构建。
+
 ## 烧录
 
 XIAO nRF52840 最简单的烧录方式是 UF2：
@@ -107,16 +115,11 @@ XIAO nRF52840 最简单的烧录方式是 UF2：
 
 ## 第一阶段任务
 
-1. 引入 `../../protocol/viberack_protocol.h`。
-2. 建立 GATT 服务：
-   - Binding Table Service
-   - Light Control Service
-   - BAS
-   - DIS
-   - Secure DFU
-3. 实现 `READ_ONE`、`READ_ALL`、`WRITE_ONE`、`SET_QTY`。
-4. 实现 `FIND` 和 `OFF`。
-5. 加入 table_seq 持久化和全表 CRC。
+1. Binding Table Service 和 Light Control Service 已建立。
+2. `READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`、`FACTORY_RESET` 已实现。
+3. `FIND`、`PICK`、`SORT`、`STOCK_IN`、`OFF` 灯控帧和状态框架已实现。
+4. table_seq 持久化和全表 CRC 已实现。
+5. 后续补 BAS、DIS、Secure DFU、NT3H2111 和电池 ADC。
 
 ## APP 对接契约
 

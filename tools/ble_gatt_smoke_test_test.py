@@ -8,6 +8,7 @@ from ble_gatt_smoke_test import (
     make_test_vectors,
     validate_read_all_notifications,
     validate_read_one_notifications,
+    validate_status_notification,
 )
 
 
@@ -25,6 +26,19 @@ def test_vectors_match_manual_bringup_values() -> None:
     assert vectors["light_off"] == bytes.fromhex(
         "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
     )
+
+
+def test_vectors_cover_binding_mutations_and_factory_reset() -> None:
+    vectors = make_test_vectors()
+
+    assert vectors["clear_slot1"] == bytes.fromhex("11 01")
+    assert vectors["set_slot1_qty_42"] == bytes.fromhex("30 01 2A 00")
+    assert vectors["insert_slot1"] == bytes.fromhex(
+        "20 01 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18"
+    )
+    assert vectors["remove_slot1"] == bytes.fromhex("21 01")
+    assert vectors["move_slot1_to_2_len_1"] == bytes.fromhex("22 01 02 01")
+    assert vectors["factory_reset"] == bytes.fromhex("F0 A5 A5 5A 5A")
 
 
 def test_read_one_validation_requires_exact_slot_record() -> None:
@@ -68,6 +82,19 @@ def test_read_all_validation_rejects_missing_end_marker() -> None:
         raise AssertionError("expected SmokeValidationError")
 
 
+def test_status_validation_requires_exact_op_and_status() -> None:
+    validate_status_notification([bytes.fromhex("10 00"), bytes.fromhex("30 00")], 0x30)
+
+
+def test_status_validation_rejects_missing_status() -> None:
+    try:
+        validate_status_notification([bytes.fromhex("10 00")], 0x30)
+    except SmokeValidationError as exc:
+        assert "status notification" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
 def test_explains_corebluetooth_unsupported_error() -> None:
     message = explain_ble_backend_error(RuntimeError("BLE is unsupported"))
 
@@ -78,9 +105,12 @@ def test_explains_corebluetooth_unsupported_error() -> None:
 
 if __name__ == "__main__":
     test_vectors_match_manual_bringup_values()
+    test_vectors_cover_binding_mutations_and_factory_reset()
     test_read_one_validation_requires_exact_slot_record()
     test_read_one_validation_rejects_wrong_payload()
     test_read_all_validation_requires_end_marker()
     test_read_all_validation_rejects_missing_end_marker()
+    test_status_validation_requires_exact_op_and_status()
+    test_status_validation_rejects_missing_status()
     test_explains_corebluetooth_unsupported_error()
     print("ble gatt smoke test vectors passed")

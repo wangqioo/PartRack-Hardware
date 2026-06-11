@@ -13,6 +13,7 @@ BINDING_CP_UUID = "7f4b1001-8d1a-4d45-9a4e-2b4a7c000000"
 TABLE_INFO_UUID = "7f4b1002-8d1a-4d45-9a4e-2b4a7c000000"
 LIGHT_COMMAND_UUID = "7f4b2001-8d1a-4d45-9a4e-2b4a7c000000"
 LIGHT_STATUS_UUID = "7f4b2002-8d1a-4d45-9a4e-2b4a7c000000"
+FACTORY_RESET_MAGIC_LE = bytes.fromhex("A5 A5 5A 5A")
 
 
 class SmokeValidationError(RuntimeError):
@@ -28,10 +29,17 @@ def expected_slot1_record() -> bytes:
 
 
 def make_test_vectors() -> dict[str, bytes]:
+    record = expected_slot1_record()
     return {
-        "write_slot1": bytes([0x10]) + expected_slot1_record(),
+        "write_slot1": bytes([0x10]) + record,
         "read_slot1": bytes([0x01, 0x01]),
         "read_all": bytes([0x02]),
+        "clear_slot1": bytes([0x11, 0x01]),
+        "insert_slot1": bytes([0x20, 0x01]) + record,
+        "remove_slot1": bytes([0x21, 0x01]),
+        "move_slot1_to_2_len_1": bytes([0x22, 0x01, 0x02, 0x01]),
+        "set_slot1_qty_42": bytes([0x30, 0x01, 0x2A, 0x00]),
+        "factory_reset": bytes([0xF0]) + FACTORY_RESET_MAGIC_LE,
         "light_find_slot1_red_10s": LightCommand(
             mode=LightMode.FIND,
             mask_a=slot_mask(1),
@@ -68,6 +76,15 @@ def validate_read_all_notifications(notifications: list[bytes]) -> None:
         raise SmokeValidationError(f"READ_ALL end marker was not observed; observed: {observed}")
 
 
+def validate_status_notification(notifications: list[bytes], op: int, status: int = 0) -> None:
+    expected = bytes([op, status])
+    if expected not in notifications:
+        observed = ", ".join(hex_bytes(data) for data in notifications) or "<none>"
+        raise SmokeValidationError(
+            f"status notification {hex_bytes(expected)} was not observed; observed: {observed}"
+        )
+
+
 def explain_ble_backend_error(exc: BaseException) -> str:
     message = str(exc)
     if "BLE is unsupported" in message:
@@ -79,7 +96,7 @@ def explain_ble_backend_error(exc: BaseException) -> str:
     return f"BLE backend error: {message}"
 
 
-async def run_smoke(device_name: str) -> None:
+async def run_smoke(device_name: str, include_destructive: bool) -> None:
     try:
         from bleak import BleakClient, BleakScanner
         from bleak.exc import BleakError
@@ -111,6 +128,8 @@ async def run_smoke(device_name: str) -> None:
         vectors = make_test_vectors()
         await client.write_gatt_char(BINDING_CP_UUID, vectors["write_slot1"], response=True)
         await asyncio.sleep(0.2)
+        validate_status_notification(notifications, 0x10)
+
         await client.write_gatt_char(BINDING_CP_UUID, vectors["read_slot1"], response=True)
         await asyncio.sleep(0.5)
         validate_read_one_notifications(notifications, expected_slot1_record())
@@ -120,6 +139,22 @@ async def run_smoke(device_name: str) -> None:
         await asyncio.sleep(1.0)
         validate_read_all_notifications(notifications)
 
+        notifications.clear()
+        await client.write_gatt_char(BINDING_CP_UUID, vectors["set_slot1_qty_42"], response=True)
+        await asyncio.sleep(0.2)
+        validate_status_notification(notifications, 0x30)
+
+        if include_destructive:
+            notifications.clear()
+            await client.write_gatt_char(BINDING_CP_UUID, vectors["clear_slot1"], response=True)
+            await asyncio.sleep(0.2)
+            validate_status_notification(notifications, 0x11)
+
+            notifications.clear()
+            await client.write_gatt_char(BINDING_CP_UUID, vectors["factory_reset"], response=True)
+            await asyncio.sleep(0.5)
+            validate_status_notification(notifications, 0xF0)
+
         await client.stop_notify(BINDING_CP_UUID)
 
 
@@ -128,13 +163,18 @@ def main() -> int:
     parser.add_argument("--device-name", default=DEVICE_NAME)
     parser.add_argument("--print-vectors", action="store_true")
     parser.add_argument("--run-smoke", action="store_true")
+    parser.add_argument(
+        "--include-destructive",
+        action="store_true",
+        help="also run CLEAR_ONE and FACTORY_RESET; this erases test binding data",
+    )
     args = parser.parse_args()
 
     if args.print_vectors or not args.run_smoke:
         print_test_vectors()
 
     if args.run_smoke:
-        asyncio.run(run_smoke(args.device_name))
+        asyncio.run(run_smoke(args.device_name, args.include_destructive))
 
     return 0
 

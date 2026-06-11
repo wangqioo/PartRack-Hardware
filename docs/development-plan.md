@@ -30,7 +30,8 @@
   - 绿灯慢闪：固件 ready，正在广播，未连接。
   - 蓝灯常亮：BLE 已连接。
 - 已新增电脑侧 BLE/GATT 烟测辅助脚本：`tools/ble_gatt_smoke_test.py`。
-- BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录和 `READ_ALL` 结束帧；当前本机运行真实 BLE 烟测阻塞在 macOS CoreBluetooth 后端不可用，未进入设备扫描阶段。
+- BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录、`READ_ALL` 结束帧、`SET_QTY` 状态 notify，并可选执行 `CLEAR_ONE` / `FACTORY_RESET`；当前本机运行真实 BLE 烟测阻塞在 macOS CoreBluetooth 后端不可用，未进入设备扫描阶段。
+- 已新增本机一键验证脚本：`tools/verify_host.sh`。
 - 已实现 Binding Table settings/NVS 持久化：
   - 25 个槽位和 `table_seq` 会编码为带 magic/version/CRC16 的 snapshot。
   - 固件启动时通过 Zephyr settings 读取 `vbrk/binding_table`。
@@ -134,12 +135,12 @@
 - 执行 `WRITE_ONE` 写入槽位，重启设备，再通过 `READ_ONE` 读回同一槽位。
 - 真实 BLE 后端可用时，执行 `WRITE_ONE` 写入槽位后，通过 notify 和 `READ_ONE` 读回验证。
 - 真实 BLE 后端可用时，执行 `READ_ALL` 结束帧验证。
-- `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET` 的端到端验证。
+- 真实 BLE 后端可用时，执行 `SET_QTY` 状态 notify 验证。
+- 可破坏测试窗口内执行 `CLEAR_ONE`、`FACTORY_RESET` 的端到端验证。
 - 灯控命令实机验证：发送非 OFF 后 D3/P0.29 拉高，发送 OFF 或超时后拉低。
 
 待开发：
 
-- 扩展 BLE/GATT 烟测覆盖 `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET`。
 - 接真实 WS2812 灯条，并用手机灯控命令验证 Zephyr `led_strip` 驱动输出。
 - 再回到 `nrf52dk_nrf52832` 做目标芯片资源、引脚和功耗验证。
 - 修正编译期 API/配置问题。

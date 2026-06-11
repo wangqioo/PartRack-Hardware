@@ -14,16 +14,16 @@
 - BLE 广播：设备名、厂商字段、table_seq、电量、状态位。初版代码已写，待编译验证。
 - NFC FD 唤醒：GPIO 中断 + 50ms 去抖。初版代码已写，待板级验证。
 - 绑定表：25 条 16B 记录。内存模型和 settings/NVS 持久化已写，手机重启读回待验证。
-- 操作码：`READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`。初版代码已写，基础编译和测试向量已验证，端到端联调待扩展。
-- 灯控：`FIND`、`PICK`、`SORT`、`STOCK_IN`、`OFF`。协议调度、25 槽 RGB 帧生成和 D3/P0.29 电源门控已写，WS2812 实际数据输出待做。
-- 灯效输出：PWM + EasyDMA。
+- 操作码：`READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`、`FACTORY_RESET`。初版代码已写，基础编译和测试向量已验证，端到端联调待扩展。
+- 灯控：`FIND`、`PICK`、`SORT`、`STOCK_IN`、`OFF`。协议调度、25 槽 RGB 帧生成、D3/P0.29 电源门控和 XIAO WS2812 SPI 输出绑定已写，真实灯条待接线验证。
+- 灯效输出：XIAO 开发板走 Zephyr `worldsemi,ws2812-spi`；回到 nRF52832 目标硬件时复核 SPI/I2S/PWM 方案。
 - 超时熄灯：独立于 BLE 连接状态。
 
 ## P0 硬件打样
 
 - 主控板原理图。
 - 主控首版按 nRF52832 设计，预留 nRF52811 降成本评估记录。
-- PWM DATA 引脚映射确认。
+- WS2812 DATA 引脚映射确认。
 - NT3H2111 I2C 与 FD 引脚连接确认。
 - P-MOS 灯条整断电电路。
 - 电池、LDO、测试点和调试接口。
@@ -45,7 +45,7 @@
 ## P1 联调工具
 
 - BLE 模拟器：模拟底盘广播和 GATT 行为。
-- 协议帧测试向量。
+- 协议帧测试向量和 `tools/ble_gatt_smoke_test.py`。
 - 灯控掩码可视化小工具。
 - FDS 绑定表随机操作一致性测试。
 

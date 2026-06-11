@@ -18,7 +18,7 @@ https://github.com/Yrd980/LCSC_android_erp.git
 本仓库 v1 交付范围：
 
 - 智能底盘硬件：25 槽，首版采用 nRF52832 + NT3H2111 + WS2812B 灯条 + 锂电；nRF52811 作为后续降成本备选。
-- 固件：四态机、FDS 绑定表、NFC FD 唤醒、PWM + EasyDMA 灯效、Secure DFU。
+- 固件：四态机、settings/NVS 绑定表、NFC FD 唤醒、WS2812 硬件外设灯效、Secure DFU。
 - BLE 协议：绑定表服务、灯控服务、标准 BAS/DIS/DFU，作为 APP 对接契约。
 - 硬件资料：主控板、灯条 PCB、底盘/料盒结构、打样验证清单。
 
@@ -36,6 +36,8 @@ v1.5/v2 见 [docs/roadmap.md](docs/roadmap.md)。
 Android APP 对接指南见 [docs/android-ble-integration-guide.md](docs/android-ble-integration-guide.md)。
 
 开发期 BLE/GATT 烟测脚本依赖见 [requirements-dev.txt](requirements-dev.txt)。
+
+本机一键验证脚本：`tools/verify_host.sh`。
 
 ## 目录
 
@@ -58,6 +60,6 @@ tools/              本地开发/模拟/校验工具
 
 - 硬件是槽位绑定关系的单一事实源。
 - 结构化槽位操作必须在 MCU 端执行，APP 不自行重编号后覆盖。
-- WS2812B 禁止 GPIO bit-bang，固件必须使用 PWM + EasyDMA。
+- WS2812B 禁止 GPIO bit-bang，固件必须使用 nRF 硬件外设和 DMA 友好的驱动路径；XIAO 开发板当前使用 Zephyr `worldsemi,ws2812-spi`。
 - 绑定表写操作走 FDS 写穿，不能裸调 NVMC。
 - 默认 MTU 23 下所有单帧指令必须可达。

@@ -8,8 +8,8 @@
 - 固件工具链：nRF Connect SDK / Zephyr。
 - 当前设备名：`VBRK-0000`。
 - 当前已实机验证：手机可扫描、连接、发现 GATT 服务、读取 `Table Info` 和 `Light Status`。
-- 当前已脚本化但待真实 BLE 后端复测：`WRITE_ONE -> READ_ONE` 的 notify 闭环、`READ_ALL` 结束帧。
-- 当前仍在开发：持久化存储、真实 WS2812 灯光输出。
+- 当前已脚本化但待真实 BLE 后端复测：`WRITE_ONE -> READ_ONE` 的 notify 闭环、`READ_ALL` 结束帧、`SET_QTY`、可选 `CLEAR_ONE`/`FACTORY_RESET`。
+- 当前固件已接入 settings/NVS 持久化和 XIAO WS2812 SPI 输出绑定；仍需实机做“写入 -> 重启 -> 读回”和真实灯条点亮确认。
 
 ## 角色边界
 
@@ -132,7 +132,7 @@ Service UUID:
 | Light Command | `7f4b2001-8d1a-4d45-9a4e-2b4a7c000000` | Write Without Response | 下发灯光命令 |
 | Light Status | `7f4b2002-8d1a-4d45-9a4e-2b4a7c000000` | Read, Notify | 读取灯光状态 |
 
-当前灯光服务已可读写框架状态，但真实 WS2812 输出还未接入。
+当前灯光服务已接入 XIAO WS2812 SPI 输出绑定。APP 可按协议下发灯控命令；真实灯条颜色和槽位仍需硬件接线后验证。
 
 ## 连接后初始化流程
 
@@ -420,6 +420,13 @@ python3 -m venv .venv
 - 写入第 1 槽 `C1234567` / `qty=12`。
 - 发送 `READ_ONE` 并校验读回记录完全一致。
 - 发送 `READ_ALL` 并校验结束帧 `02 00 FF`。
+- 发送 `SET_QTY` 并校验写操作状态 notify。
+
+若要同时验证清空和恢复出厂，可追加：
+
+```bash
+python3 tools/ble_gatt_smoke_test.py --run-smoke --include-destructive
+```
 
 如果输出 `CoreBluetooth reported 'BLE is unsupported'`，说明当前电脑运行环境不能访问 macOS 蓝牙后端，尚未进入设备扫描阶段，不代表 nRF 设备失败。
 
@@ -427,8 +434,8 @@ python3 -m venv .venv
 
 当前限制：
 
-- 绑定表仍是 RAM 模型，断电会丢。后续会接入 settings/NVS 持久化。
-- 真实 WS2812 灯条还未接入。当前只能验证 BLE 命令和状态框架。
+- 绑定表已接入 settings/NVS 持久化，但仍需做手机实机“写入 -> 重启 -> 读回”确认。
+- WS2812 已接入 XIAO devicetree/SPI 驱动，真实灯条仍需接线确认颜色、槽位和供电。
 - 设备名仍固定为 `VBRK-0000`。后续会改为按设备唯一信息生成 `VBRK-XXXX`。
 - NFC URI 尚未接入。后续目标格式为 `lcscerp://device?mac=...&batch=...&ver=1`。
 - OTA 尚未接入。
