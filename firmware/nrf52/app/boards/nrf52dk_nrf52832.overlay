@@ -1,14 +1,22 @@
 / {
-    vbrk_led_data: vbrk_led_data {
-        gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
+    vbrk_outputs {
+        compatible = "gpio-leds";
+
+        vbrk_led_data: led_data {
+            gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
+        };
+
+        vbrk_led_power: led_power {
+            gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+        };
     };
 
-    vbrk_led_power: vbrk_led_power {
-        gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-    };
+    vbrk_inputs {
+        compatible = "gpio-keys";
 
-    vbrk_nfc_fd: vbrk_nfc_fd {
-        gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
+        vbrk_nfc_fd: nfc_fd {
+            gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
+        };
     };
 
     aliases {

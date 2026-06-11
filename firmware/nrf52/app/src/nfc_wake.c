@@ -12,7 +12,7 @@
 
 LOG_MODULE_REGISTER(nfc_wake, LOG_LEVEL_INF);
 
-#if DT_ALIAS_EXISTS(vbrk_nfc_fd)
+#if DT_HAS_ALIAS(vbrk_nfc_fd)
 static const struct gpio_dt_spec fd_gpio = GPIO_DT_SPEC_GET(DT_ALIAS(vbrk_nfc_fd), gpios);
 static struct gpio_callback fd_callback;
 static int64_t last_fd_ms;
@@ -37,7 +37,7 @@ static void nfc_fd_handler(const struct device *dev, struct gpio_callback *cb, u
 
 int nfc_wake_init(void)
 {
-#if DT_ALIAS_EXISTS(vbrk_nfc_fd)
+#if DT_HAS_ALIAS(vbrk_nfc_fd)
     int err;
 
     if (!gpio_is_ready_dt(&fd_gpio)) {

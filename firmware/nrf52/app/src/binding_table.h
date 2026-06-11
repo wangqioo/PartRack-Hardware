@@ -1,6 +1,7 @@
 #ifndef BINDING_TABLE_H
 #define BINDING_TABLE_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "viberack_protocol.h"

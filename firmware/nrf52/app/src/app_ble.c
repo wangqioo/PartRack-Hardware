@@ -370,7 +370,7 @@ int app_ble_start(void)
     LOG_INF("Bluetooth initialized");
 
     fill_adv_msd();
-    err = bt_le_adv_start(BT_LE_ADV_CONN_NAME, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+    err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
     if (err != 0) {
         return err;
     }
