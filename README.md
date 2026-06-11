@@ -31,6 +31,8 @@ v1.5/v2 见 [docs/roadmap.md](docs/roadmap.md)。
 
 当前执行计划见 [docs/development-plan.md](docs/development-plan.md)。
 
+当前开发板 bring-up 资料见 [docs/xiao-nrf52840-bringup.md](docs/xiao-nrf52840-bringup.md)。
+
 ## 目录
 
 ```text

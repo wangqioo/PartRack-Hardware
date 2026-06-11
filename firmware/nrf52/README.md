@@ -38,6 +38,24 @@ firmware/nrf52/app
 - 灯控 `OFF` 和模式调度框架。
 - NFC FD GPIO 唤醒入口。
 
+## 当前开发板
+
+当前优先使用 Seeed Studio XIAO nRF52840 做开发验证。该板在 Zephyr / nRF Connect SDK 中使用 `xiao_ble` board target；Zephyr 官方也将普通版列为 `xiao_ble/nrf52840` target。
+
+开发板资料、官方链接、完整引脚表和烧录路径见 [../../docs/xiao-nrf52840-bringup.md](../../docs/xiao-nrf52840-bringup.md)。
+
+XIAO nRF52840 开发期引脚映射：
+
+```text
+WS2812 DATA       -> D2 / P0.28
+灯条 P-MOS 控制   -> D3 / P0.29
+NFC FD 模拟输入   -> D0 / P0.02
+NT3H2111 I2C SDA  -> D4 / P0.04
+NT3H2111 I2C SCL  -> D5 / P0.05
+```
+
+这些映射只用于开发板 bring-up。首版目标主控仍是 nRF52832，回到目标硬件时需要重新确认引脚、功耗和 Flash/RAM 余量。
+
 待接真实硬件：
 
 - 绑定表 settings/NVS 持久化。
@@ -49,13 +67,35 @@ firmware/nrf52/app
 
 ## 构建
 
-安装 nRF Connect SDK 后，在本仓库根目录运行：
+安装 nRF Connect SDK 后，在本仓库根目录优先构建 XIAO nRF52840：
+
+```bash
+west build -b xiao_ble firmware/nrf52/app
+```
+
+如果使用 XIAO nRF52840 Sense，可使用：
+
+```bash
+west build -b xiao_ble/nrf52840/sense firmware/nrf52/app
+```
+
+回到 nRF52832 DK 验证时运行：
 
 ```bash
 west build -b nrf52dk_nrf52832 firmware/nrf52/app
 ```
 
-当前开发机未检测到 `west`/`cmake`，所以本轮只做了源码和协议脚本校验，未做 Zephyr 完整编译。
+当前开发机未检测到 `west`/`nrfutil`，所以本轮只做源码、协议脚本和文档校验，未做 Zephyr 完整编译。
+
+## 烧录
+
+XIAO nRF52840 最简单的烧录方式是 UF2：
+
+1. 双击板载 reset，让开发板进入 bootloader 模式。
+2. 系统出现 `XIAO BLE` U 盘。
+3. 将 `build/zephyr/zephyr.uf2` 拖入该 U 盘。
+
+若使用 J-Link/SWD，也可以在 nRF Connect SDK 环境中使用 `west flash`。
 
 ## 第一阶段任务
 

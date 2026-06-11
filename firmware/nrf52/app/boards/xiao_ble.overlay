@@ -1,0 +1,19 @@
+/ {
+    vbrk_led_data: vbrk_led_data {
+        gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>; /* XIAO D2 */
+    };
+
+    vbrk_led_power: vbrk_led_power {
+        gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>; /* XIAO D3 */
+    };
+
+    vbrk_nfc_fd: vbrk_nfc_fd {
+        gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>; /* XIAO D0 */
+    };
+
+    aliases {
+        vbrk-led-data = &vbrk_led_data;
+        vbrk-led-power = &vbrk_led_power;
+        vbrk-nfc-fd = &vbrk_nfc_fd;
+    };
+};

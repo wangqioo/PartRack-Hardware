@@ -6,8 +6,10 @@
 
 - 首版主控：nRF52832。
 - 后续降成本备选：nRF52811。
-- 开发验证/高配实验：nRF52840。
+- 当前开发验证板：Seeed Studio XIAO nRF52840，使用 nRF Connect SDK / Zephyr 的 `xiao_ble` board target。
+- 高配实验/余量验证：nRF52840。
 - 固件工具链：优先 nRF Connect SDK / Zephyr。
+- XIAO nRF52840 资料、引脚和烧录路径沉淀在 [xiao-nrf52840-bringup.md](xiao-nrf52840-bringup.md)。
 - 本仓库不开发 APP 页面、Room 数据库、BOM 匹配、扫码入库、二维码打印和库存导入导出。
 
 ## 阶段 0：协议冻结
@@ -47,7 +49,9 @@
 
 待办：
 
-- 安装 nRF Connect SDK 后完成 Zephyr 编译验证。
+- 安装 nRF Connect SDK 后，优先完成 XIAO nRF52840 的 `west build -b xiao_ble firmware/nrf52/app` 编译验证。
+- 在 XIAO nRF52840 上完成 BLE 广播、GATT 服务和绑定表命令的开发板验证。
+- 再回到 `nrf52dk_nrf52832` 做目标芯片资源、引脚和功耗验证。
 - 修正编译期 API/配置问题。
 - 接入 settings/NVS 持久化。
 - 接入电池 ADC。
