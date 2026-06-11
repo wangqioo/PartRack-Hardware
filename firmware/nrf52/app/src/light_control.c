@@ -1,6 +1,7 @@
 #include "light_control.h"
 
 #include <errno.h>
+#include <string.h>
 
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
@@ -9,6 +10,7 @@
 #include <zephyr/logging/log.h>
 
 #include "app_ble.h"
+#include "viberack_light_frame.h"
 #include "viberack_light_policy.h"
 
 LOG_MODULE_REGISTER(light_control, LOG_LEVEL_INF);
@@ -21,6 +23,7 @@ static const struct gpio_dt_spec led_power_gpio = GPIO_DT_SPEC_GET(DT_ALIAS(vbrk
 static struct k_work_delayable off_work;
 static uint8_t active_mode;
 static int64_t expires_at_ms;
+static vbrk_light_frame_t active_frame;
 
 static int configure_light_outputs(void)
 {
@@ -55,19 +58,37 @@ static void set_light_outputs(bool power_on)
 
 static void drive_leds_off(void)
 {
+    memset(&active_frame, 0, sizeof(active_frame));
     set_light_outputs(false);
     LOG_INF("light off");
 }
 
 static void drive_leds_command(const vbrk_light_command_t *command)
 {
+    uint8_t active_slots = 0;
+    int err;
+
+    err = vbrk_light_frame_build(command, &active_frame);
+    if (err != 0) {
+        LOG_WRN("light frame build failed: %d", err);
+        return;
+    }
+
+    for (uint8_t i = 0; i < VBRK_SLOT_COUNT; i++) {
+        const vbrk_rgb_t *rgb = &active_frame.slots[i];
+
+        if (rgb->r != 0 || rgb->g != 0 || rgb->b != 0) {
+            active_slots++;
+        }
+    }
+
     set_light_outputs(true);
     /*
      * TODO: implement WS2812 output with PWM + EasyDMA.
      * mask_a/mask_b and RGB colors are already in the protocol frame.
      */
-    LOG_INF("light mode=%u mask_a=0x%08x mask_b=0x%08x",
-            command->mode, command->mask_a_le, command->mask_b_le);
+    LOG_INF("light mode=%u active_slots=%u mask_a=0x%08x mask_b=0x%08x",
+            command->mode, active_slots, command->mask_a_le, command->mask_b_le);
 }
 
 static void off_work_handler(struct k_work *work)

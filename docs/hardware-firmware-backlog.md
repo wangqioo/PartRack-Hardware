@@ -15,7 +15,7 @@
 - NFC FD 唤醒：GPIO 中断 + 50ms 去抖。初版代码已写，待板级验证。
 - 绑定表：25 条 16B 记录。内存模型和 settings/NVS 持久化已写，手机重启读回待验证。
 - 操作码：`READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`。初版代码已写，基础编译和测试向量已验证，端到端联调待扩展。
-- 灯控：`FIND`、`PICK`、`SORT`、`STOCK_IN`、`OFF`。协议调度和 D3/P0.29 电源门控已写，WS2812 实际数据输出待做。
+- 灯控：`FIND`、`PICK`、`SORT`、`STOCK_IN`、`OFF`。协议调度、25 槽 RGB 帧生成和 D3/P0.29 电源门控已写，WS2812 实际数据输出待做。
 - 灯效输出：PWM + EasyDMA。
 - 超时熄灯：独立于 BLE 连接状态。
 

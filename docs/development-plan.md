@@ -40,12 +40,17 @@
   - D3/P0.29 作为开发期 P-MOS 控制，非 OFF 灯控命令拉高，OFF/超时拉低。
   - D2/P0.28 作为 WS2812 DATA，当前保持低电平，避免未实现数据输出时倒灌。
   - 灯控 timeout/default/FX cap 逻辑已抽到 host-side 可测试策略模块。
+- 已实现灯控 RGB 帧生成：
+  - 根据 `mask_a/mask_b` 生成 25 槽 RGB 帧。
+  - `color_b` 会覆盖同槽位的 `color_a`，用于表达更高优先级。
+  - 超出 25 槽的 mask bit 会忽略。
+  - 已加入 host-side light frame 单测。
 
 当前仍未完成：
 
 - Binding Table 的 `WRITE_ONE -> READ_ONE` 还需要完整 notify 闭环验证。
 - Binding Table 持久化固件已烧录到 XIAO nRF52840 Sense，仍需做“写入 -> 重启 -> 读回”的手机实机确认。
-- 灯控已有 GATT 接口、状态框架和电源门控，还没有真实 WS2812 数据输出。
+- 灯控已有 GATT 接口、状态框架、电源门控和 25 槽 RGB 帧生成，还没有真实 WS2812 数据输出。
 - NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
 
 下一步优先级：
@@ -97,10 +102,12 @@
 - `READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`、`FACTORY_RESET`。
 - 灯控模式调度和超时熄灯框架。
 - 灯条电源门控：D3/P0.29 高电平上电，OFF/超时断电；D2/P0.28 保持低电平。
+- 灯控 RGB 帧生成：`mask_a/mask_b` -> 25 槽 RGB buffer，`color_b` 覆盖 `color_a`。
 - NFC FD GPIO 唤醒入口。
 - settings/NVS 绑定表持久化初版。
 - 绑定表 snapshot 编码、CRC 校验和损坏数据拒绝测试。
 - 灯控策略 host-side 测试：默认 30s、最大 300s、FX 最大 10s、OFF 断电、非法 mode 拒绝。
+- 灯控帧 host-side 测试：OFF 清空、A/B mask 着色、B 覆盖 A、越界 bit 忽略。
 
 已完成实机验证：
 
@@ -142,12 +149,13 @@
 
 - 开发期 P-MOS 电源门控：D3/P0.29 高电平导通。
 - DATA 断电期间保持低电平：D2/P0.28 输出低电平。
+- 25 槽 RGB 帧生成：固件收到灯控命令后会构建 frame 并记录 active slot 数。
 
 待办：
 
 - 确认 WS2812 DATA 引脚映射。
 - 实现 PWM + EasyDMA 编码。
-- 实现 `FIND`、`PICK`、`SORT`、`STOCK_IN`、`OFF` 的真实灯效。
+- 将 25 槽 RGB frame 编码并输出到真实 WS2812 灯条。
 - 测试 3.7V 灯条亮度和一致性。
 - 测试静态断电电流。
 
