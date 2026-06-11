@@ -12,19 +12,58 @@
 - XIAO nRF52840 资料、引脚和烧录路径沉淀在 [xiao-nrf52840-bringup.md](xiao-nrf52840-bringup.md)。
 - 本仓库不开发 APP 页面、Room 数据库、BOM 匹配、扫码入库、二维码打印和库存导入导出。
 
+## 当前进度快照
+
+已完成：
+
+- 仓库已同步到 GitHub：`wangqioo/PartRack-Hardware`。
+- nRF Connect SDK / Zephyr 本机工具链已可构建 XIAO nRF52840 Sense 固件。
+- 已通过 UF2 烧录到 Seeed Studio XIAO nRF52840 Sense。
+- 官方 Zephyr `peripheral_hr` 样例已在同一开发板上验证，手机可扫描到 `Zephyr Heartrate Sensor`。
+- PartRack 固件已实现并实机验证 BLE 广播、连接、GATT service discovery、`Table Info` 读取和 `Light Status` 读取。
+- 已修复两个 bring-up 问题：
+  - `CONFIG_BT_SETTINGS=y` 后必须在 `bt_enable()` 后调用 `settings_load()`。
+  - 连接断开后必须重新启动 connectable advertising，否则手机再次扫描不到设备。
+- 已加入板载 LED 诊断：
+  - 蓝灯快速闪 3 次：固件启动。
+  - 红灯闪：初始化或 BLE 启动失败。
+  - 绿灯慢闪：固件 ready，正在广播，未连接。
+  - 蓝灯常亮：BLE 已连接。
+- 已新增电脑侧 BLE/GATT 烟测辅助脚本：`tools/ble_gatt_smoke_test.py`。
+
+当前仍未完成：
+
+- Binding Table 的 `WRITE_ONE -> READ_ONE` 还需要完整 notify 闭环验证。
+- 绑定表仍是 RAM 内存模型，重启或断电会丢。
+- 灯控现在只有 GATT 接口和状态框架，还没有真实 WS2812 输出。
+- NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
+
+下一步优先级：
+
+1. 完成 Binding Table 手工或脚本化读写闭环验证。
+2. 接入 settings/NVS，让绑定表和 `table_seq` 持久化。
+3. 接入 WS2812 PWM + EasyDMA 和 P-MOS 电源门控。
+4. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
+5. 回到 nRF52832 目标资源预算和硬件约束验证。
+
 ## 阶段 0：协议冻结
 
 目标：让 APP、固件、测试工具对同一份二进制协议达成一致。
 
-待办：
+已完成：
 
 - 固定自定义 128-bit UUID。
 - 固定 Binding Table Service 和 Light Control Service 特征 UUID。
 - 固定 `READ_ALL` 结束帧格式。
 - 固定 Table Info：`table_seq`、全表 `crc16`、`slot_count`。
 - 固定灯控状态 Notify：`mode + remaining_s`。
-- 固定错误码和 APP 重试策略。
-- 输出 APP 对接测试向量。
+- 固定基础错误码。
+- 输出协议头文件、协议校验脚本和 nRF Connect 手工测试帧。
+
+待办：
+
+- 固定 APP 侧重试策略。
+- 将手机手工测试升级为电脑侧自动 BLE/GATT 烟测。
 
 交付物：
 
@@ -47,12 +86,26 @@
 - 灯控模式调度和超时熄灯框架。
 - NFC FD GPIO 唤醒入口。
 
-待办：
+已完成实机验证：
 
-- 在 XIAO nRF52840 Sense 上完成 BLE 广播、GATT 服务和绑定表命令的开发板验证。
+- XIAO nRF52840 Sense 可扫描到 `VBRK-0000`。
+- 手机 nRF Connect 可连接，连接后板载蓝灯常亮。
+- 手机可发现 Binding Table Service 和 Light Control Service。
+- `Table Info` 读取通过，实测返回 `0100 0000 2DE4 19`。
+- `Light Status` 读取通过，空闲状态返回 `0000 00`。
+- 断开连接后设备会恢复广播。
+
+当前待验证：
+
+- `WRITE_ONE` 写入槽位后，通过 notify 和 `READ_ONE` 读回验证。
+- `READ_ALL`、`CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET` 的端到端验证。
+
+待开发：
+
+- 接入 settings/NVS 持久化。
+- 将 BLE/GATT 手工测试脚本化，减少手机手输 Hex。
 - 再回到 `nrf52dk_nrf52832` 做目标芯片资源、引脚和功耗验证。
 - 修正编译期 API/配置问题。
-- 接入 settings/NVS 持久化。
 - 接入电池 ADC。
 - 完成 BLE 加密/配对策略验证。
 - 增加复位原因上报。
