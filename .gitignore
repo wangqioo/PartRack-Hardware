@@ -1,0 +1,27 @@
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+
+# C / embedded
+_build/
+cmake-build-*/
+*.hex
+*.elf
+*.map
+*.bin
+
+# Python
+__pycache__/
+*.pyc
+.venv/
