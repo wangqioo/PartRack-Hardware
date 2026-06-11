@@ -18,6 +18,8 @@
 
 LOG_MODULE_REGISTER(app_ble, LOG_LEVEL_INF);
 
+void app_status_set_ble_connected(bool connected);
+
 #define VBRK_BT_UUID_BASE BT_UUID_128_ENCODE(0x7f4b0000, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
 #define VBRK_BT_UUID_BINDING_SERVICE BT_UUID_128_ENCODE(0x7f4b0001, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
 #define VBRK_BT_UUID_BINDING_CP BT_UUID_128_ENCODE(0x7f4b1001, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
@@ -71,6 +73,12 @@ static const struct bt_data ad[] = {
 static const struct bt_data sd[] = {
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
+
+static int start_advertising(void)
+{
+    fill_adv_msd();
+    return bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+}
 
 static uint8_t status_from_errno(int err)
 {
@@ -282,17 +290,26 @@ static void connected(struct bt_conn *conn, uint8_t err)
     }
 
     current_conn = bt_conn_ref(conn);
+    app_status_set_ble_connected(true);
     LOG_INF("connected");
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
+    int err;
+
     ARG_UNUSED(conn);
 
     LOG_INF("disconnected: %u", reason);
     if (current_conn != NULL) {
         bt_conn_unref(current_conn);
         current_conn = NULL;
+    }
+    app_status_set_ble_connected(false);
+
+    err = start_advertising();
+    if (err != 0) {
+        LOG_ERR("advertising restart failed: %d", err);
     }
 }
 
@@ -377,8 +394,7 @@ int app_ble_start(void)
         }
     }
 
-    fill_adv_msd();
-    err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+    err = start_advertising();
     if (err != 0) {
         return err;
     }

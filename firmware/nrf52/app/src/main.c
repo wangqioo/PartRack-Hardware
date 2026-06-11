@@ -17,6 +17,7 @@ LOG_MODULE_REGISTER(part_rack, LOG_LEVEL_INF);
 static const struct gpio_dt_spec led_red = GPIO_DT_SPEC_GET(LED_RED_NODE, gpios);
 static const struct gpio_dt_spec led_green = GPIO_DT_SPEC_GET(LED_GREEN_NODE, gpios);
 static const struct gpio_dt_spec led_blue = GPIO_DT_SPEC_GET(LED_BLUE_NODE, gpios);
+static volatile bool ble_connected;
 
 static void status_led_set(const struct gpio_dt_spec *led, bool on)
 {
@@ -97,6 +98,19 @@ int main(void)
     LOG_INF("PartRack firmware ready");
 
     while (true) {
+        if (ble_connected) {
+            status_led_set(&led_green, false);
+            status_led_set(&led_blue, true);
+            k_msleep(200);
+            continue;
+        }
+
+        status_led_set(&led_blue, false);
         blink_status(&led_green, 1, 200, 1800);
     }
+}
+
+void app_status_set_ble_connected(bool connected)
+{
+    ble_connected = connected;
 }
