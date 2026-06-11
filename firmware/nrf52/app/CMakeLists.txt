@@ -15,4 +15,5 @@ target_sources(app PRIVATE
   src/light_control.c
   src/nfc_wake.c
   ../../../protocol/viberack_protocol.c
+  ../../../protocol/viberack_storage.c
 )

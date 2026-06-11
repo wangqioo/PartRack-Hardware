@@ -182,3 +182,76 @@ BLE backend is unavailable: CoreBluetooth reported 'BLE is unsupported'.
 ```
 
 该错误发生在 macOS CoreBluetooth 后端初始化阶段，尚未进入 BLE 扫描，不能作为固件或设备广播失败判断。
+
+## 2026-06-12 Binding Table 持久化记录
+
+已完成固件侧 settings/NVS 持久化初版：
+
+- settings key: `vbrk/binding_table`。
+- 保存内容：`table_seq` + 25 个 `vbrk_slot_record_t`。
+- 保存格式：`magic/version/length/table_seq/records/crc16`。
+- CRC 失败、magic/version/length 不匹配时会丢弃 snapshot，并回到空表。
+- 写入类操作会先写 flash，保存成功后才替换 RAM 表和递增 `table_seq`。
+
+已验证的本机命令：
+
+```bash
+cc -std=c11 -Wall -Wextra -Iprotocol tools/storage_snapshot_test.c \
+  protocol/viberack_protocol.c protocol/viberack_storage.c \
+  -o /tmp/storage_snapshot_test
+/tmp/storage_snapshot_test
+python3 tools/protocol_check.py
+python3 tools/binding_table_model_test.py
+python3 tools/ble_gatt_smoke_test_test.py
+```
+
+固件构建命令：
+
+```bash
+cd /Users/wq/ncs
+ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb GNUARMEMB_TOOLCHAIN_PATH=/opt/homebrew \
+  /Users/wq/ncs/.venv/bin/west build -p always -b xiao_ble/nrf52840/sense \
+  /Users/wq/PartRack-Hardware/firmware/nrf52/app \
+  -d /Users/wq/ncs/build-partrack-xiao-sense
+```
+
+最新 UF2：
+
+```text
+/Users/wq/ncs/build-partrack-xiao-sense/app/zephyr/zephyr.uf2
+```
+
+持久化手工验证步骤：
+
+1. 双击 reset，让系统出现 `/Volumes/XIAO-SENSE`。
+2. 复制最新 `zephyr.uf2` 到 `/Volumes/XIAO-SENSE/zephyr.uf2`。
+3. 手机 nRF Connect 连接 `VBRK-0000`。
+4. 展开 Binding Table Service `7f4b0001-8d1a-4d45-9a4e-2b4a7c000000`。
+5. 对 Binding Control Point `7f4b1001-8d1a-4d45-9a4e-2b4a7c000000` 开启 notify。
+6. 写入第 1 槽测试记录，格式选择 Hex：
+
+```text
+10 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18
+```
+
+7. 发送 `READ_ONE slot 1`：
+
+```text
+01 01
+```
+
+期望 notify：
+
+```text
+01 00 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18
+```
+
+8. 断开连接，重启开发板。
+9. 再次连接 `VBRK-0000`，重新开启 Binding Control Point notify。
+10. 再发送 `01 01`，期望仍然读回同一条记录。
+
+如果串口可读，重启后应能看到类似日志：
+
+```text
+binding table restored: seq=...
+```

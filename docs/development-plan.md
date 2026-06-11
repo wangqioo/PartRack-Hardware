@@ -31,18 +31,23 @@
   - 蓝灯常亮：BLE 已连接。
 - 已新增电脑侧 BLE/GATT 烟测辅助脚本：`tools/ble_gatt_smoke_test.py`。
 - BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录和 `READ_ALL` 结束帧；当前本机运行真实 BLE 烟测阻塞在 macOS CoreBluetooth 后端不可用，未进入设备扫描阶段。
+- 已实现 Binding Table settings/NVS 持久化：
+  - 25 个槽位和 `table_seq` 会编码为带 magic/version/CRC16 的 snapshot。
+  - 固件启动时通过 Zephyr settings 读取 `vbrk/binding_table`。
+  - 写入类操作会先保存到 flash，保存成功后才更新 RAM 和递增 `table_seq`。
+  - 已加入 host-side snapshot 单测。
 
 当前仍未完成：
 
 - Binding Table 的 `WRITE_ONE -> READ_ONE` 还需要完整 notify 闭环验证。
-- 绑定表仍是 RAM 内存模型，重启或断电会丢。
+- Binding Table 持久化固件已构建通过，仍需烧录后做“写入 -> 重启 -> 读回”的实机确认。
 - 灯控现在只有 GATT 接口和状态框架，还没有真实 WS2812 输出。
 - NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
 
 下一步优先级：
 
-1. 在可访问本机蓝牙栈的环境中运行 `tools/ble_gatt_smoke_test.py --run-smoke`，完成 Binding Table 真实设备读写闭环验证。
-2. 接入 settings/NVS，让绑定表和 `table_seq` 持久化。
+1. 烧录 Binding Table 持久化固件，完成手机 nRF Connect 手工验证：写入槽位、重启、再次连接读回。
+2. 在可访问本机蓝牙栈的环境中运行 `tools/ble_gatt_smoke_test.py --run-smoke`，完成 Binding Table 真实设备读写闭环验证。
 3. 接入 WS2812 PWM + EasyDMA 和 P-MOS 电源门控。
 4. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
 5. 回到 nRF52832 目标资源预算和硬件约束验证。
@@ -87,6 +92,8 @@
 - `READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`、`FACTORY_RESET`。
 - 灯控模式调度和超时熄灯框架。
 - NFC FD GPIO 唤醒入口。
+- settings/NVS 绑定表持久化初版。
+- 绑定表 snapshot 编码、CRC 校验和损坏数据拒绝测试。
 
 已完成实机验证：
 
@@ -100,13 +107,13 @@
 
 当前待验证：
 
+- 烧录持久化固件后，执行 `WRITE_ONE` 写入槽位，重启设备，再通过 `READ_ONE` 读回同一槽位。
 - 真实 BLE 后端可用时，执行 `WRITE_ONE` 写入槽位后，通过 notify 和 `READ_ONE` 读回验证。
 - 真实 BLE 后端可用时，执行 `READ_ALL` 结束帧验证。
 - `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET` 的端到端验证。
 
 待开发：
 
-- 接入 settings/NVS 持久化。
 - 扩展 BLE/GATT 烟测覆盖 `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET`。
 - 再回到 `nrf52dk_nrf52832` 做目标芯片资源、引脚和功耗验证。
 - 修正编译期 API/配置问题。
