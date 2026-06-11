@@ -70,6 +70,48 @@
 5. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
 6. 回到 nRF52832 目标资源预算和硬件约束验证。
 
+## 给 APP / 手机开发同学的同步
+
+当前 APP 可以开始并行接入 BLE，不需要等最终 nRF52832 硬件回来。开发期先以 XIAO nRF52840 Sense 上的 `VBRK-0000` 为目标设备。
+
+APP 现在可以做：
+
+- 扫描设备名 `VBRK-0000`，后续量产按 `VBRK-` 前缀过滤。
+- 解析广播 Manufacturer Data：开发期 Company ID 为 `0xFFFF`，包含 `proto_ver`、`batch_id`、`battery_pct`、`status_flags`、`table_seq`。
+- 连接后执行 service discovery，找到 Binding Table Service 和 Light Control Service。
+- 读取 `Table Info`，用 `table_seq + crc16 + slot_count` 判断硬件侧绑定表版本。
+- 开启 Binding Control Point、Table Info、Light Status 的 notify。
+- 通过 Binding Control Point 做 `READ_ALL`，同步硬件侧 25 槽绑定表。
+- 通过 `WRITE_ONE` / `READ_ONE` 做单槽写入和读回比对。
+- 通过 `SET_QTY` 修改库存数量，并观察 Binding Control Point / Table Info notify。
+- 通过 Light Command 下发 `FIND` / `PICK` / `SORT` / `STOCK_IN` / `OFF` 灯控命令。
+
+推荐联调最小闭环：
+
+1. `connectGatt()`。
+2. `discoverServices()`。
+3. 读取 `Table Info`。
+4. 开启 Binding Control Point notify。
+5. `WRITE_ONE` 写入 slot 1。
+6. `READ_ONE` 读回 slot 1，并比较 16B 槽位记录。
+7. `READ_ALL` 同步全表，等待 `02 00 FF` 结束帧。
+8. `SET_QTY` 修改数量，并确认状态 notify 和 `table_seq` 变化。
+9. 发送 Light Command，并读取或订阅 `Light Status`。
+
+APP 侧需要注意：
+
+- Binding Control Point 当前是 encrypted write；Android 写入前要处理配对/加密，遇到 authentication/encryption 错误后触发系统配对再重试。
+- `CLEAR_ONE` 和 `FACTORY_RESET` 属于破坏性测试，只能在测试设备和测试数据上执行。
+- `VBRK-0000`、Company ID `0xFFFF`、`batch_id = 1` 都是开发期占位值，APP 不要写死为量产假设。
+- 当前 NFC URI、OTA 和电池 ADC 还没有接入，APP 先不要依赖这些能力。
+- Binding Table 持久化和 WS2812 灯条输出固件侧已实现，但仍需要真实设备完成“写入 -> 重启 -> 读回”和真实灯条颜色验证。
+
+APP 同学主要看这几份文档：
+
+- [android-ble-integration-guide.md](android-ble-integration-guide.md)：APP 接入流程、权限、UUID、帧格式。
+- [ble-protocol-v0.1.md](ble-protocol-v0.1.md)：协议定义源文档。
+- `tools/ble_gatt_smoke_test.py --print-vectors`：可直接复用的测试帧样例。
+
 ## 阶段 0：协议冻结
 
 目标：让 APP、固件、测试工具对同一份二进制协议达成一致。
@@ -109,7 +151,7 @@
 - 25 槽绑定表内存模型。
 - `READ_ONE`、`READ_ALL`、`WRITE_ONE`、`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`SET_QTY`、`FACTORY_RESET`。
 - 灯控模式调度和超时熄灯框架。
-- 灯条电源门控：D3/P0.29 高电平上电，OFF/超时断电；D2/P0.28 保持低电平。
+- 灯条电源门控：D3/P0.29 高电平上电，OFF/超时断电；D2/P0.28 作为 WS2812 SPI2 MOSI 输出。
 - 灯控 RGB 帧生成：`mask_a/mask_b` -> 25 槽 RGB buffer，`color_b` 覆盖 `color_a`。
 - 灯控像素输出入口：frame -> 25 槽 RGB pixels -> 可选 Zephyr `led_strip_update_rgb()`。
 - XIAO WS2812 SPI 输出绑定：D2/P0.28 作为 SPI2 MOSI，25 像素 GRB，Zephyr 官方 WS2812 SPI 驱动。

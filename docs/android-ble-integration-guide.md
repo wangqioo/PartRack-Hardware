@@ -11,6 +11,44 @@
 - 当前已脚本化但待真实 BLE 后端复测：`WRITE_ONE -> READ_ONE` 的 notify 闭环、`READ_ALL` 结束帧、`SET_QTY`、可选 `CLEAR_ONE`/`FACTORY_RESET`。
 - 当前固件已接入 settings/NVS 持久化和 XIAO WS2812 SPI 输出绑定；仍需实机做“写入 -> 重启 -> 读回”和真实灯条点亮确认。
 
+## 当前 APP 可并行开发任务
+
+APP 同学现在可以不等最终 PCB，直接按当前 XIAO nRF52840 Sense 固件开发 BLE Central 侧逻辑。
+
+| 模块 | 现在可做 | 注意 |
+|---|---|---|
+| 扫描 | 按 `VBRK-0000` 或 `VBRK-` 前缀扫描 | 设备名在 Scan Response 里 |
+| 广播解析 | 解析 Manufacturer Data 的协议版本、电量、状态位、`table_seq` | Company ID `0xFFFF` 是开发占位 |
+| 连接 | `connectGatt()` 后 `discoverServices()` | 断开后设备会恢复广播 |
+| 绑定表同步 | 读取 `Table Info`，再发送 `READ_ALL` | 全表结束帧是 `02 00 FF` |
+| 单槽写入 | `WRITE_ONE` 后 `READ_ONE` 比对 16B 记录 | Binding CP 写入需要加密/配对 |
+| 库存数量 | 用 `SET_QTY` 修改槽位数量 | 成功后应观察 notify 和 `table_seq` 变化 |
+| 灯控 | 下发 `FIND` / `PICK` / `SORT` / `STOCK_IN` / `OFF` | 真实灯条颜色仍待硬件实测 |
+
+建议先实现这个最小闭环：
+
+```text
+scan VBRK-0000
+connect
+discoverServices
+read Table Info
+enable Binding CP notify
+enable Table Info notify
+WRITE_ONE slot 1
+READ_ONE slot 1
+READ_ALL until 02 00 FF
+SET_QTY slot 1
+send Light Command
+read or subscribe Light Status
+```
+
+不要作为量产假设的开发期占位：
+
+- 设备名固定为 `VBRK-0000`。
+- Manufacturer Company ID 为 `0xFFFF`。
+- `batch_id = 1`。
+- NFC URI、OTA、电池 ADC 已在硬件计划中，但当前固件还没有提供 APP 可用接口。
+
 ## 角色边界
 
 本仓库只提供硬件、固件和 BLE 协议契约。
