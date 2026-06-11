@@ -133,3 +133,41 @@ UF2 烧录验证路径：
 3. 启动盘自动弹出，设备重新枚举为 Zephyr CDC。
 
 已用官方 Zephyr `samples/bluetooth/peripheral_hr` 对 `xiao_ble/nrf52840/sense` 做过基线验证，手机可扫描到 `Zephyr Heartrate Sensor`。
+
+## 2026-06-11 BLE bring-up 记录
+
+已在 Seeed Studio XIAO nRF52840 Sense 上完成以下验证：
+
+- 官方 Zephyr `samples/bluetooth/peripheral_hr` 可被手机 nRF Connect 扫描到，设备名为 `Zephyr Heartrate Sensor`。
+- PartRack 固件可被手机 nRF Connect 扫描到，设备名为 `VBRK-0000`。
+- 手机可连接 `VBRK-0000`，连接成功后板载蓝灯常亮。
+- 手机可发现两个 PartRack 自定义 GATT service：
+  - Binding Table Service: `7f4b0001-8d1a-4d45-9a4e-2b4a7c000000`
+  - Light Control Service: `7f4b0002-8d1a-4d45-9a4e-2b4a7c000000`
+- `Table Info` 读取通过，实测返回 `0100 0000 2DE4 19`。
+- `Light Status` 读取通过，空闲状态返回 `0000 00`。
+
+本轮定位出的两个关键固件点：
+
+- 启用 `CONFIG_BT_SETTINGS=y` 后，需要在 `bt_enable()` 后调用 `settings_load()`，否则广播启动会失败。
+- connectable advertising 在建立连接后会停止；断开回调中需要重新调用 `bt_le_adv_start()`，否则一次连接尝试后手机会再次扫描不到设备。
+
+板载 LED 诊断约定：
+
+- 开机蓝灯快速闪 3 次：固件启动。
+- 红灯闪：初始化或 BLE 启动失败。
+- 绿灯慢闪：固件 ready，正在广播，未连接。
+- 蓝灯常亮：BLE 已连接。
+
+电脑侧测试辅助：
+
+```bash
+python3 tools/ble_gatt_smoke_test.py --print-vectors
+```
+
+如果本机可用 BLE 并安装了 `bleak`，可尝试自动烟测：
+
+```bash
+python3 -m pip install bleak
+python3 tools/ble_gatt_smoke_test.py --run-smoke
+```

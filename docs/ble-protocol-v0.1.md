@@ -64,6 +64,30 @@ op(1B) + status(1B) + payload
 | `0x30` | `SET_QTY` | `slot(1B) + qty(2B)` |
 | `0xF0` | `FACTORY_RESET` | `magic(4B)`，`0x5A5AA5A5` |
 
+### 手工测试帧
+
+以下帧可在 nRF Connect 中使用 Hex / Byte Array 模式写入。
+
+写入第 1 槽，`part_id=C1234567`，`qty=12`：
+
+```text
+10 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18
+```
+
+读取第 1 槽：
+
+```text
+01 01
+```
+
+读取全表：
+
+```text
+02
+```
+
+注意：如果 nRF Connect 的 `Last Write` 显示为 `3130 2030...`，说明写入模式是 Text/String，而不是 Hex / Byte Array。
+
 ## 灯控帧
 
 17 字节，Write Without Response：
