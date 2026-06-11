@@ -40,13 +40,13 @@
 当前仍未完成：
 
 - Binding Table 的 `WRITE_ONE -> READ_ONE` 还需要完整 notify 闭环验证。
-- Binding Table 持久化固件已构建通过，仍需烧录后做“写入 -> 重启 -> 读回”的实机确认。
+- Binding Table 持久化固件已烧录到 XIAO nRF52840 Sense，仍需做“写入 -> 重启 -> 读回”的手机实机确认。
 - 灯控现在只有 GATT 接口和状态框架，还没有真实 WS2812 输出。
 - NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
 
 下一步优先级：
 
-1. 烧录 Binding Table 持久化固件，完成手机 nRF Connect 手工验证：写入槽位、重启、再次连接读回。
+1. 使用手机 nRF Connect 手工验证 Binding Table 持久化：写入槽位、重启、再次连接读回。
 2. 在可访问本机蓝牙栈的环境中运行 `tools/ble_gatt_smoke_test.py --run-smoke`，完成 Binding Table 真实设备读写闭环验证。
 3. 接入 WS2812 PWM + EasyDMA 和 P-MOS 电源门控。
 4. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
@@ -107,7 +107,7 @@
 
 当前待验证：
 
-- 烧录持久化固件后，执行 `WRITE_ONE` 写入槽位，重启设备，再通过 `READ_ONE` 读回同一槽位。
+- 执行 `WRITE_ONE` 写入槽位，重启设备，再通过 `READ_ONE` 读回同一槽位。
 - 真实 BLE 后端可用时，执行 `WRITE_ONE` 写入槽位后，通过 notify 和 `READ_ONE` 读回验证。
 - 真实 BLE 后端可用时，执行 `READ_ALL` 结束帧验证。
 - `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET` 的端到端验证。

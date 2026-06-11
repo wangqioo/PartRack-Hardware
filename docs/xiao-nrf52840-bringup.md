@@ -221,6 +221,12 @@ ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb GNUARMEMB_TOOLCHAIN_PATH=/opt/homebrew \
 /Users/wq/ncs/build-partrack-xiao-sense/app/zephyr/zephyr.uf2
 ```
 
+当前烧录状态：
+
+- 2026-06-12 已复制最新 UF2 到 `/Volumes/XIAO-SENSE/zephyr.uf2`。
+- 烧录后 bootloader 盘自动弹出，设备重新枚举为 `/dev/cu.usbmodem1101`。
+- 串口读取到 SoftDevice Controller 启动日志。
+
 持久化手工验证步骤：
 
 1. 双击 reset，让系统出现 `/Volumes/XIAO-SENSE`。
