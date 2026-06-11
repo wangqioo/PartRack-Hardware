@@ -35,6 +35,8 @@ v1.5/v2 见 [docs/roadmap.md](docs/roadmap.md)。
 
 Android APP 对接指南见 [docs/android-ble-integration-guide.md](docs/android-ble-integration-guide.md)。
 
+开发期 BLE/GATT 烟测脚本依赖见 [requirements-dev.txt](requirements-dev.txt)。
+
 ## 目录
 
 ```text

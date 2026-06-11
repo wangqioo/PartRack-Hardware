@@ -165,9 +165,20 @@ UF2 烧录验证路径：
 python3 tools/ble_gatt_smoke_test.py --print-vectors
 ```
 
-如果本机可用 BLE 并安装了 `bleak`，可尝试自动烟测：
+如果本机可用 BLE，可安装开发依赖后尝试自动烟测：
 
 ```bash
-python3 -m pip install bleak
-python3 tools/ble_gatt_smoke_test.py --run-smoke
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke
 ```
+
+自动烟测会连接 `VBRK-0000`，读取 `Table Info` / `Light Status`，开启 Binding Control Point notify，写入第 1 槽，发送 `READ_ONE` 校验读回的 16B 槽位记录，并发送 `READ_ALL` 校验结束帧 `02 00 FF`。
+
+2026-06-12 当前本机执行结果：
+
+```text
+BLE backend is unavailable: CoreBluetooth reported 'BLE is unsupported'.
+```
+
+该错误发生在 macOS CoreBluetooth 后端初始化阶段，尚未进入 BLE 扫描，不能作为固件或设备广播失败判断。

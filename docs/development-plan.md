@@ -30,6 +30,7 @@
   - 绿灯慢闪：固件 ready，正在广播，未连接。
   - 蓝灯常亮：BLE 已连接。
 - 已新增电脑侧 BLE/GATT 烟测辅助脚本：`tools/ble_gatt_smoke_test.py`。
+- BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录和 `READ_ALL` 结束帧；当前本机运行真实 BLE 烟测阻塞在 macOS CoreBluetooth 后端不可用，未进入设备扫描阶段。
 
 当前仍未完成：
 
@@ -40,7 +41,7 @@
 
 下一步优先级：
 
-1. 完成 Binding Table 手工或脚本化读写闭环验证。
+1. 在可访问本机蓝牙栈的环境中运行 `tools/ble_gatt_smoke_test.py --run-smoke`，完成 Binding Table 真实设备读写闭环验证。
 2. 接入 settings/NVS，让绑定表和 `table_seq` 持久化。
 3. 接入 WS2812 PWM + EasyDMA 和 P-MOS 电源门控。
 4. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
@@ -59,11 +60,12 @@
 - 固定灯控状态 Notify：`mode + remaining_s`。
 - 固定基础错误码。
 - 输出协议头文件、协议校验脚本和 nRF Connect 手工测试帧。
+- 输出 BLE/GATT 烟测脚本的闭环校验逻辑。
 
 待办：
 
 - 固定 APP 侧重试策略。
-- 将手机手工测试升级为电脑侧自动 BLE/GATT 烟测。
+- 在可用 BLE 后端上跑通电脑侧自动 BLE/GATT 烟测。
 
 交付物：
 
@@ -94,16 +96,18 @@
 - `Table Info` 读取通过，实测返回 `0100 0000 2DE4 19`。
 - `Light Status` 读取通过，空闲状态返回 `0000 00`。
 - 断开连接后设备会恢复广播。
+- `tools/ble_gatt_smoke_test.py` 已生成并校验 `WRITE_ONE`、`READ_ONE`、`READ_ALL`、灯控命令测试帧。
 
 当前待验证：
 
-- `WRITE_ONE` 写入槽位后，通过 notify 和 `READ_ONE` 读回验证。
-- `READ_ALL`、`CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET` 的端到端验证。
+- 真实 BLE 后端可用时，执行 `WRITE_ONE` 写入槽位后，通过 notify 和 `READ_ONE` 读回验证。
+- 真实 BLE 后端可用时，执行 `READ_ALL` 结束帧验证。
+- `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET` 的端到端验证。
 
 待开发：
 
 - 接入 settings/NVS 持久化。
-- 将 BLE/GATT 手工测试脚本化，减少手机手输 Hex。
+- 扩展 BLE/GATT 烟测覆盖 `CLEAR_ONE`、`SET_QTY`、`FACTORY_RESET`。
 - 再回到 `nrf52dk_nrf52832` 做目标芯片资源、引脚和功耗验证。
 - 修正编译期 API/配置问题。
 - 接入电池 ADC。

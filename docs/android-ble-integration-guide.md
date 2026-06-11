@@ -8,7 +8,8 @@
 - 固件工具链：nRF Connect SDK / Zephyr。
 - 当前设备名：`VBRK-0000`。
 - 当前已实机验证：手机可扫描、连接、发现 GATT 服务、读取 `Table Info` 和 `Light Status`。
-- 当前仍在验证：`WRITE_ONE -> READ_ONE` 的 notify 闭环、持久化存储、真实 WS2812 灯光输出。
+- 当前已脚本化但待真实 BLE 后端复测：`WRITE_ONE -> READ_ONE` 的 notify 闭环、`READ_ALL` 结束帧。
+- 当前仍在开发：持久化存储、真实 WS2812 灯光输出。
 
 ## 角色边界
 
@@ -398,6 +399,29 @@ interface PartRackBleClient {
 - [ ] APP 根据 `table_seq` 判断硬件表是否变化。
 - [ ] APP 下发 `FIND` / `PICK` / `STOCK_IN` / `OFF`。
 - [ ] APP 对写入失败、配对失败、断连重连做用户可理解的错误提示。
+
+## 硬件烟测脚本
+
+本仓库提供电脑侧 BLE/GATT 烟测脚本，APP 开发者可以用它对照 APP 行为：
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python tools/ble_gatt_smoke_test.py --print-vectors
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke
+```
+
+`--run-smoke` 会自动执行：
+
+- 扫描 `VBRK-0000`。
+- 读取 `Table Info`。
+- 读取 `Light Status`。
+- 开启 `Binding Control Point` notify。
+- 写入第 1 槽 `C1234567` / `qty=12`。
+- 发送 `READ_ONE` 并校验读回记录完全一致。
+- 发送 `READ_ALL` 并校验结束帧 `02 00 FF`。
+
+如果输出 `CoreBluetooth reported 'BLE is unsupported'`，说明当前电脑运行环境不能访问 macOS 蓝牙后端，尚未进入设备扫描阶段，不代表 nRF 设备失败。
 
 ## 当前限制和后续变化
 

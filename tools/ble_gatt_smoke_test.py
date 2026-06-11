@@ -15,14 +15,21 @@ LIGHT_COMMAND_UUID = "7f4b2001-8d1a-4d45-9a4e-2b4a7c000000"
 LIGHT_STATUS_UUID = "7f4b2002-8d1a-4d45-9a4e-2b4a7c000000"
 
 
+class SmokeValidationError(RuntimeError):
+    pass
+
+
 def hex_bytes(data: bytes) -> str:
     return data.hex(" ").upper()
 
 
+def expected_slot1_record() -> bytes:
+    return SlotRecord(slot=1, part_id="C1234567", qty=12, flags=0).encode()
+
+
 def make_test_vectors() -> dict[str, bytes]:
     return {
-        "write_slot1": bytes([0x10])
-        + SlotRecord(slot=1, part_id="C1234567", qty=12, flags=0).encode(),
+        "write_slot1": bytes([0x10]) + expected_slot1_record(),
         "read_slot1": bytes([0x01, 0x01]),
         "read_all": bytes([0x02]),
         "light_find_slot1_red_10s": LightCommand(
@@ -45,13 +52,45 @@ def print_test_vectors() -> None:
         print(f"{name}: {hex_bytes(data)}")
 
 
+def validate_read_one_notifications(notifications: list[bytes], expected_record: bytes) -> None:
+    expected = bytes([0x01, 0x00]) + expected_record
+    if expected not in notifications:
+        observed = ", ".join(hex_bytes(data) for data in notifications) or "<none>"
+        raise SmokeValidationError(
+            f"READ_ONE success notification with expected payload was not observed; observed: {observed}"
+        )
+
+
+def validate_read_all_notifications(notifications: list[bytes]) -> None:
+    expected_end = bytes([0x02, 0x00, 0xFF])
+    if expected_end not in notifications:
+        observed = ", ".join(hex_bytes(data) for data in notifications) or "<none>"
+        raise SmokeValidationError(f"READ_ALL end marker was not observed; observed: {observed}")
+
+
+def explain_ble_backend_error(exc: BaseException) -> str:
+    message = str(exc)
+    if "BLE is unsupported" in message:
+        return (
+            "BLE backend is unavailable: CoreBluetooth reported 'BLE is unsupported'. "
+            "This usually means the current terminal/runtime is restricted from using the macOS "
+            f"Bluetooth stack, not that the nRF device failed. Original error: {message}"
+        )
+    return f"BLE backend error: {message}"
+
+
 async def run_smoke(device_name: str) -> None:
     try:
         from bleak import BleakClient, BleakScanner
+        from bleak.exc import BleakError
     except ImportError as exc:
         raise SystemExit("bleak is required for --run-smoke: python3 -m pip install bleak") from exc
 
-    device = await BleakScanner.find_device_by_name(device_name, timeout=10.0)
+    try:
+        device = await BleakScanner.find_device_by_name(device_name, timeout=10.0)
+    except BleakError as exc:
+        raise SystemExit(explain_ble_backend_error(exc)) from exc
+
     if device is None:
         raise SystemExit(f"device not found: {device_name}")
 
@@ -73,12 +112,15 @@ async def run_smoke(device_name: str) -> None:
         await client.write_gatt_char(BINDING_CP_UUID, vectors["write_slot1"], response=True)
         await asyncio.sleep(0.2)
         await client.write_gatt_char(BINDING_CP_UUID, vectors["read_slot1"], response=True)
-        await asyncio.sleep(1.0)
-        await client.stop_notify(BINDING_CP_UUID)
+        await asyncio.sleep(0.5)
+        validate_read_one_notifications(notifications, expected_slot1_record())
 
-    expected_prefix = bytes([0x01, 0x00])
-    if not any(data.startswith(expected_prefix) for data in notifications):
-        raise SystemExit("READ_ONE success notification was not observed")
+        notifications.clear()
+        await client.write_gatt_char(BINDING_CP_UUID, vectors["read_all"], response=True)
+        await asyncio.sleep(1.0)
+        validate_read_all_notifications(notifications)
+
+        await client.stop_notify(BINDING_CP_UUID)
 
 
 def main() -> int:
