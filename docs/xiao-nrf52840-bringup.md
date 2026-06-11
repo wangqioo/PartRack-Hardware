@@ -36,16 +36,16 @@ PartRack 正式固件使用 nRF Connect SDK / Zephyr，原因：
 
 ## Zephyr board target
 
+当前手上开发板为 XIAO nRF52840 Sense，优先使用精确 Sense target：
+
+```bash
+west build -b xiao_ble/nrf52840/sense /path/to/PartRack-Hardware/firmware/nrf52/app
+```
+
 普通 XIAO nRF52840：
 
 ```bash
-west build -b xiao_ble firmware/nrf52/app
-```
-
-XIAO nRF52840 Sense：
-
-```bash
-west build -b xiao_ble/nrf52840/sense firmware/nrf52/app
+west build -b xiao_ble /path/to/PartRack-Hardware/firmware/nrf52/app
 ```
 
 回到 nRF52832 DK：
@@ -64,7 +64,7 @@ west build -b nrf52dk_nrf52832 firmware/nrf52/app
 | NT3H2111 SDA | D4 | P0.04 | XIAO 默认 I2C SDA。 |
 | NT3H2111 SCL | D5 | P0.05 | XIAO 默认 I2C SCL。 |
 
-当前 overlay: `firmware/nrf52/app/boards/xiao_ble.overlay`。
+当前 overlay: `firmware/nrf52/app/boards/xiao_ble.overlay`。Zephyr 会在 `xiao_ble/nrf52840/sense` 构建中加载 `xiao_ble_nrf52840_sense.dts`，再叠加本项目的开发期引脚映射。
 
 ## XIAO 常用引脚表
 
@@ -112,15 +112,24 @@ west flash
 
 ## 当前本机状态
 
-本机当前未检测到 nRF Connect SDK 命令行工具：
+当前本机 NCS workspace：
 
 ```text
-west: command not found
-nrfutil: command not found
+/Users/wq/ncs
 ```
 
-因此当前只能完成源码、协议脚本和文档校验。安装 nRF Connect SDK 后，第一条验证命令是：
+已验证命令：
 
 ```bash
-west build -b xiao_ble firmware/nrf52/app
+ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb GNUARMEMB_TOOLCHAIN_PATH=/opt/homebrew \
+  /Users/wq/ncs/.venv/bin/west build -b xiao_ble/nrf52840/sense \
+  /Users/wq/PartRack-Hardware/firmware/nrf52/app
 ```
+
+UF2 烧录验证路径：
+
+1. 双击 reset，系统出现 `/Volumes/XIAO-SENSE`。
+2. 复制 `build/.../zephyr.uf2` 到 `/Volumes/XIAO-SENSE/zephyr.uf2`。
+3. 启动盘自动弹出，设备重新枚举为 Zephyr CDC。
+
+已用官方 Zephyr `samples/bluetooth/peripheral_hr` 对 `xiao_ble/nrf52840/sense` 做过基线验证，手机可扫描到 `Zephyr Heartrate Sensor`。

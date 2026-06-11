@@ -40,7 +40,7 @@ firmware/nrf52/app
 
 ## 当前开发板
 
-当前优先使用 Seeed Studio XIAO nRF52840 做开发验证。该板在 Zephyr / nRF Connect SDK 中使用 `xiao_ble` board target；Zephyr 官方也将普通版列为 `xiao_ble/nrf52840` target。
+当前优先使用 Seeed Studio XIAO nRF52840 Sense 做开发验证。该板在 Zephyr / nRF Connect SDK 中使用 `xiao_ble/nrf52840/sense` board target；普通 XIAO nRF52840 可使用 `xiao_ble` 或 `xiao_ble/nrf52840` target。
 
 开发板资料、官方链接、完整引脚表和烧录路径见 [../../docs/xiao-nrf52840-bringup.md](../../docs/xiao-nrf52840-bringup.md)。
 
@@ -67,16 +67,16 @@ NT3H2111 I2C SCL  -> D5 / P0.05
 
 ## 构建
 
-安装 nRF Connect SDK 后，在本仓库根目录优先构建 XIAO nRF52840：
+安装 nRF Connect SDK 后，在 NCS workspace 中优先构建 XIAO nRF52840 Sense：
 
 ```bash
-west build -b xiao_ble firmware/nrf52/app
+west build -b xiao_ble/nrf52840/sense /path/to/PartRack-Hardware/firmware/nrf52/app
 ```
 
-如果使用 XIAO nRF52840 Sense，可使用：
+普通 XIAO nRF52840 可使用：
 
 ```bash
-west build -b xiao_ble/nrf52840/sense firmware/nrf52/app
+west build -b xiao_ble /path/to/PartRack-Hardware/firmware/nrf52/app
 ```
 
 回到 nRF52832 DK 验证时运行：
@@ -85,7 +85,7 @@ west build -b xiao_ble/nrf52840/sense firmware/nrf52/app
 west build -b nrf52dk_nrf52832 firmware/nrf52/app
 ```
 
-当前开发机未检测到 `west`/`nrfutil`，所以本轮只做源码、协议脚本和文档校验，未做 Zephyr 完整编译。
+当前开发机的 NCS workspace 位于 `/Users/wq/ncs`，已完成 XIAO nRF52840 Sense 目标构建和 UF2 烧录验证。
 
 ## 烧录
 

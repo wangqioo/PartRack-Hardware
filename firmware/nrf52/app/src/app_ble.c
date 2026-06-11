@@ -10,6 +10,7 @@
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
 #include <zephyr/sys/byteorder.h>
 
 #include "binding_table.h"
@@ -368,6 +369,13 @@ int app_ble_start(void)
     }
 
     LOG_INF("Bluetooth initialized");
+
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        err = settings_load();
+        if (err != 0) {
+            return err;
+        }
+    }
 
     fill_adv_msd();
     err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
