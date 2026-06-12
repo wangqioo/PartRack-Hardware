@@ -8,6 +8,7 @@
 |---|---|
 | `tools/protocol_check.py` | CRC8、slot mask、16B 槽位记录、17B 灯控帧 |
 | `tools/storage_snapshot_test.c` | snapshot magic、version、CRC、损坏拒绝 |
+| `tools/binding_table_core_test.c` | 绑定表 write/read/clear/insert/remove/move/set qty/factory reset、`table_seq`、CRC 拒绝、保存失败原子性 |
 | `tools/light_policy_test.c` | OFF、默认 30s、上限 300s、FX 上限 10s、非法 mode |
 | `tools/light_frame_test.c` | mask 着色、B 覆盖 A、越界 bit、active slot 统计 |
 
@@ -20,8 +21,6 @@
 
 ## 下一批 host/model 验证
 
-- Binding table core：所有表操作、CRC 拒绝、满表、空槽、重排、`table_seq`。
-- Fake persistence：保存失败时 RAM 和 `table_seq` 不变。
 - BLE dispatcher model：opcode 长度、状态码、notify payload、`READ_ALL` end marker、Table Info notify。
 - Advertising payload：company id、proto_ver、battery、status flags、`table_seq` 低 16 位。
 - Light state machine：fake time 下的超时、remaining、OFF、重复命令刷新。
