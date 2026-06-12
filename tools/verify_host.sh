@@ -42,6 +42,11 @@ run_host_checks() {
     -o /tmp/storage_snapshot_test
   /tmp/storage_snapshot_test
 
+  cc -std=c11 -Wall -Wextra -Iprotocol \
+    tools/binding_table_core_test.c protocol/viberack_protocol.c protocol/viberack_binding_table_model.c \
+    -o /tmp/binding_table_core_test
+  /tmp/binding_table_core_test
+
   python3 tools/protocol_check.py
   python3 tools/binding_table_model_test.py
   python3 tools/ble_gatt_smoke_test_test.py
