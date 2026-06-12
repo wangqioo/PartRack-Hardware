@@ -32,6 +32,9 @@ static int commit_table(vbrk_binding_table_model_t *model,
     }
 
     next_seq = model->table_seq + 1;
+    if (next_seq == 0) {
+        next_seq = 1;
+    }
     if (model->save != NULL) {
         err = model->save(next_records, next_seq, model->save_user_data);
         if (err != 0) {
@@ -117,17 +120,25 @@ int vbrk_binding_table_model_insert_at(vbrk_binding_table_model_t *model, uint8_
 {
     vbrk_slot_record_t copy;
     vbrk_slot_record_t next_records[VBRK_SLOT_COUNT];
+    int empty_index = -1;
 
     if (model == NULL || !valid_slot(slot) || record == NULL || !record_crc_ok(record)) {
         return -EINVAL;
     }
 
-    if (model->records[VBRK_SLOT_COUNT - 1].slot != 0) {
+    for (uint8_t i = slot - 1; i < VBRK_SLOT_COUNT; i++) {
+        if (model->records[i].slot == 0) {
+            empty_index = i;
+            break;
+        }
+    }
+
+    if (empty_index < 0) {
         return -ENOSPC;
     }
 
     memcpy(next_records, model->records, sizeof(next_records));
-    for (int i = VBRK_SLOT_COUNT - 1; i >= slot; i--) {
+    for (int i = empty_index; i >= slot; i--) {
         next_records[i] = next_records[i - 1];
         if (next_records[i].slot != 0) {
             normalize_slot(&next_records[i], (uint8_t)(i + 1));

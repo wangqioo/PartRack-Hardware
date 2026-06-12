@@ -6,6 +6,10 @@
 
 #include "viberack_protocol.h"
 
+/*
+ * Save callbacks are synchronous. If the callee needs the proposed table after
+ * returning, it must copy records before returning 0.
+ */
 typedef int (*vbrk_binding_table_save_cb)(const vbrk_slot_record_t records[VBRK_SLOT_COUNT],
                                           uint32_t table_seq, void *user_data);
 
@@ -19,6 +23,10 @@ typedef struct {
 void vbrk_binding_table_model_init(vbrk_binding_table_model_t *model,
                                    vbrk_binding_table_save_cb save,
                                    void *user_data);
+/*
+ * Load trusts records from a previously validated snapshot. The caller owns
+ * snapshot integrity checks before passing data into the model.
+ */
 void vbrk_binding_table_model_load(vbrk_binding_table_model_t *model,
                                    const vbrk_slot_record_t records[VBRK_SLOT_COUNT],
                                    uint32_t table_seq);
