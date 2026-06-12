@@ -16,10 +16,13 @@ typedef struct {
 static vbrk_slot_record_t make_record(uint8_t slot, const char *part_id, uint16_t qty)
 {
     vbrk_slot_record_t record;
+    size_t part_len = strlen(part_id);
+
+    assert(part_len <= sizeof(record.part_id));
 
     memset(&record, 0, sizeof(record));
     record.slot = slot;
-    memcpy(record.part_id, part_id, strlen(part_id));
+    memcpy(record.part_id, part_id, part_len);
     record.qty_le = qty;
     record.flags = VBRK_SLOT_FLAG_LOW_STOCK;
     record.crc8 = vbrk_crc8_maxim((const uint8_t *)&record, VBRK_SLOT_RECORD_SIZE - 1);
@@ -51,7 +54,7 @@ static void assert_part_id(const vbrk_slot_record_t *record, const char *part_id
 {
     if (memcmp(record->part_id, part_id, strlen(part_id)) != 0) {
         fprintf(stderr, "expected part_id %s, got %.10s in slot %u\n",
-                part_id, record->part_id, record->slot);
+                part_id, record->part_id, (unsigned)record->slot);
     }
     assert(memcmp(record->part_id, part_id, strlen(part_id)) == 0);
 }
@@ -105,16 +108,26 @@ static void test_save_failure_is_atomic(void)
 {
     vbrk_binding_table_model_t model;
     fake_store_t store;
-    vbrk_slot_record_t record = make_record(1, "FAILSAVE", 9);
+    vbrk_slot_record_t committed = make_record(1, "KEEP", 7);
+    vbrk_slot_record_t rejected = make_record(2, "FAILSAVE", 9);
     vbrk_slot_record_t readback;
 
     init_model(&model, &store);
+
+    assert(vbrk_binding_table_model_write_one(&model, &committed) == 0);
+    assert(store.calls == 1);
+    assert(store.saved_seq == 2);
+
     store.err = -EIO;
 
-    assert(vbrk_binding_table_model_write_one(&model, &record) == -EIO);
-    assert(store.calls == 1);
-    assert(vbrk_binding_table_model_seq(&model) == 1);
+    assert(vbrk_binding_table_model_write_one(&model, &rejected) == -EIO);
+    assert(store.calls == 2);
+    assert(store.saved_seq == 2);
+    assert(vbrk_binding_table_model_seq(&model) == 2);
     assert(vbrk_binding_table_model_read_one(&model, 1, &readback) == 0);
+    assert_part_id(&readback, "KEEP");
+    assert(readback.qty_le == 7);
+    assert(vbrk_binding_table_model_read_one(&model, 2, &readback) == 0);
     assert(readback.slot == 0);
 }
 
