@@ -47,6 +47,11 @@ run_host_checks() {
     -o /tmp/binding_table_core_test
   /tmp/binding_table_core_test
 
+  cc -std=c11 -Wall -Wextra -Iprotocol \
+    tools/ble_dispatcher_model_test.c protocol/viberack_protocol.c protocol/viberack_ble_dispatcher_model.c \
+    -o /tmp/ble_dispatcher_model_test
+  /tmp/ble_dispatcher_model_test
+
   python3 tools/protocol_check.py
   python3 tools/binding_table_model_test.py
   python3 tools/ble_gatt_smoke_test_test.py
