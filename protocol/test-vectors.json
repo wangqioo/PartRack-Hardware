@@ -21,7 +21,7 @@
       "description": "READ_ALL success end marker"
     },
     "factory_reset": {
-      "hex": "F0 5A 5A A5 A5",
+      "hex": "F0 A5 A5 5A 5A",
       "description": "FACTORY_RESET destructive test command"
     }
   },

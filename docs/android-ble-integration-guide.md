@@ -273,7 +273,7 @@ op(1B) + status(1B) + payload
 | `0x21` | `REMOVE_AT` | `slot(1B)` |
 | `0x22` | `MOVE_BLOCK` | `from(1B) + to(1B) + len(1B)` |
 | `0x30` | `SET_QTY` | `slot(1B) + qty(2B)` |
-| `0xF0` | `FACTORY_RESET` | `magic(4B)`，小端 `0x5A5AA5A5` |
+| `0xF0` | `FACTORY_RESET` | magic value `0x5A5AA5A5`，wire bytes `A5 A5 5A 5A` |
 
 ### 手工测试帧
 

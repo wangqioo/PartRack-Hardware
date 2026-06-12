@@ -51,5 +51,5 @@
 `FACTORY_RESET` 会清空绑定表，只能在测试设备执行：
 
 ```text
-F0 5A 5A A5 A5
+F0 A5 A5 5A 5A
 ```
