@@ -7,11 +7,16 @@
 | 文件 | 覆盖 |
 |---|---|
 | `tools/protocol_check.py` | CRC8、slot mask、16B 槽位记录、17B 灯控帧 |
-| `tools/ble_gatt_smoke_test_test.py` | BLE smoke 脚本测试向量和 notify 校验 |
-| `tools/binding_table_model_test.py` | `MOVE_BLOCK` Python 模型 |
 | `tools/storage_snapshot_test.c` | snapshot magic、version、CRC、损坏拒绝 |
 | `tools/light_policy_test.c` | OFF、默认 30s、上限 300s、FX 上限 10s、非法 mode |
 | `tools/light_frame_test.c` | mask 着色、B 覆盖 A、越界 bit、active slot 统计 |
+
+## 已有 model 验证
+
+| 文件 | 覆盖 |
+|---|---|
+| `tools/ble_gatt_smoke_test_test.py` | BLE smoke 脚本测试向量和 notify 校验，不代表真实 BLE 通过 |
+| `tools/binding_table_model_test.py` | `MOVE_BLOCK` Python 模型 |
 
 ## 下一批 host/model 验证
 

@@ -3,7 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NCS_DIR="${NCS_DIR:-/Users/wq/ncs}"
-BUILD_DIR="${BUILD_DIR:-${NCS_DIR}/build-partrack-xiao-sense}"
+ROOT_NAME="$(basename "${ROOT_DIR}")"
+BUILD_DIR="${BUILD_DIR:-${NCS_DIR}/build-partrack-${ROOT_NAME}-xiao-sense}"
 BOARD="${BOARD:-xiao_ble/nrf52840/sense}"
 MODE="${1:---full-build}"
 
@@ -17,6 +18,11 @@ Usage: tools/verify_host.sh [--host-only|--full-build]
 Default: --full-build
 USAGE
 }
+
+if [ "$#" -gt 1 ]; then
+  usage >&2
+  exit 2
+fi
 
 run_host_checks() {
   cd "${ROOT_DIR}"
