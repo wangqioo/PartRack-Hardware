@@ -1,6 +1,7 @@
 #include "binding_table.h"
 
 #include <errno.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include <zephyr/kernel.h>
@@ -17,6 +18,18 @@ LOG_MODULE_REGISTER(binding_table, LOG_LEVEL_INF);
 #define BINDING_TABLE_SETTINGS_KEY BINDING_TABLE_SETTINGS_TREE "/" BINDING_TABLE_SETTINGS_NAME
 
 static vbrk_binding_table_model_t table_model;
+static bool table_model_initialized;
+
+static int persist_table(const vbrk_slot_record_t table[VBRK_SLOT_COUNT], uint32_t seq,
+                         void *user_data);
+
+static void ensure_table_model_initialized(void)
+{
+    if (!table_model_initialized) {
+        vbrk_binding_table_model_init(&table_model, persist_table, NULL);
+        table_model_initialized = true;
+    }
+}
 
 static int persist_table(const vbrk_slot_record_t table[VBRK_SLOT_COUNT], uint32_t seq,
                          void *user_data)
@@ -40,6 +53,8 @@ static int binding_table_settings_set(const char *key, size_t len, settings_read
     if (strcmp(key, BINDING_TABLE_SETTINGS_NAME) != 0) {
         return -ENOENT;
     }
+
+    ensure_table_model_initialized();
 
     read_len = read_cb(cb_arg, &snapshot, sizeof(snapshot));
     if (read_len < 0) {
@@ -67,6 +82,7 @@ SETTINGS_STATIC_HANDLER_DEFINE(vbrk_binding_table, BINDING_TABLE_SETTINGS_TREE,
 int binding_table_init(void)
 {
     vbrk_binding_table_model_init(&table_model, persist_table, NULL);
+    table_model_initialized = true;
     return 0;
 }
 
