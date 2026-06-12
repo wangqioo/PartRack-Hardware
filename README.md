@@ -61,5 +61,5 @@ tools/              本地开发/模拟/校验工具
 - 硬件是槽位绑定关系的单一事实源。
 - 结构化槽位操作必须在 MCU 端执行，APP 不自行重编号后覆盖。
 - WS2812B 禁止 GPIO bit-bang，固件必须使用 nRF 硬件外设和 DMA 友好的驱动路径；XIAO 开发板当前使用 Zephyr `worldsemi,ws2812-spi`。
-- 绑定表写操作走 FDS 写穿，不能裸调 NVMC。
+- 绑定表写操作走 Zephyr settings/NVS snapshot，写入成功后再更新 RAM 和 `table_seq`，不能裸调 NVMC。
 - 默认 MTU 23 下所有单帧指令必须可达。
