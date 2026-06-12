@@ -1,0 +1,42 @@
+{
+  "version": "0.1",
+  "slot_count": 25,
+  "slot_record_size": 16,
+  "light_command_size": 17,
+  "binding": {
+    "write_one_slot_1_c1234567_qty_12": {
+      "hex": "10 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18",
+      "description": "WRITE_ONE slot 1, part_id C1234567, qty 12"
+    },
+    "read_one_slot_1": {
+      "hex": "01 01",
+      "description": "READ_ONE slot 1"
+    },
+    "read_all": {
+      "hex": "02",
+      "description": "READ_ALL all 25 records"
+    },
+    "read_all_end": {
+      "hex": "02 00 FF",
+      "description": "READ_ALL success end marker"
+    },
+    "factory_reset": {
+      "hex": "F0 5A 5A A5 A5",
+      "description": "FACTORY_RESET destructive test command"
+    }
+  },
+  "light": {
+    "find_slot_1_green_30s": {
+      "hex": "01 01 00 00 00 00 00 00 00 00 FF 00 00 00 00 1E 00",
+      "description": "FIND slot 1, green, 30 seconds"
+    },
+    "pick_slots_1_7_25_green_30s": {
+      "hex": "02 41 00 00 01 00 00 00 00 00 FF 00 00 00 00 1E 00",
+      "description": "PICK slots 1, 7, 25, green, 30 seconds"
+    },
+    "off": {
+      "hex": "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00",
+      "description": "OFF all lights"
+    }
+  }
+}
