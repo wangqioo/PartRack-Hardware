@@ -10,7 +10,7 @@
 
 - 供电：电池侧经灯条电源门控。
 - 信号：单线 DIN，由主控板输出。
-- 连接器：至少包含 VBAT_LED、DIN、GND。
+- 连接器：至少包含 VBAT_LED、DIN、GND；额定电流、锁扣/防反插、间距、线对板或板对板形式按 `hardware/main-board/schematic-requirements-v1.md` 的连接器前置决策冻结。
 - DIN 建议预留串联电阻位置。
 - 灯条供电入口预留 bulk capacitance。
 - 每颗灯珠按器件建议放置去耦电容。
