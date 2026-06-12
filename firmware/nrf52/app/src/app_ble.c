@@ -15,6 +15,7 @@
 
 #include "binding_table.h"
 #include "light_control.h"
+#include "viberack_ble_dispatcher_model.h"
 
 LOG_MODULE_REGISTER(app_ble, LOG_LEVEL_INF);
 
@@ -80,24 +81,6 @@ static int start_advertising(void)
     return bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 }
 
-static uint8_t status_from_errno(int err)
-{
-    if (err == 0) {
-        return VBRK_STATUS_OK;
-    }
-    if (err == -ENOSPC) {
-        return VBRK_STATUS_ERR_FULL;
-    }
-    if (err == -EBUSY) {
-        return VBRK_STATUS_ERR_FLASH_BUSY;
-    }
-    if (err == -EILSEQ) {
-        return VBRK_STATUS_ERR_CRC;
-    }
-
-    return VBRK_STATUS_ERR_PARAM;
-}
-
 static ssize_t table_info_read(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                void *buf, uint16_t len, uint16_t offset)
 {
@@ -120,13 +103,87 @@ static ssize_t light_status_read(struct bt_conn *conn, const struct bt_gatt_attr
     return bt_gatt_attr_read(conn, attr, buf, len, offset, status, sizeof(status));
 }
 
+static int dispatcher_read_one(uint8_t slot, vbrk_slot_record_t *record, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return binding_table_read_one(slot, record);
+}
+
+static int dispatcher_write_one(const vbrk_slot_record_t *record, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return binding_table_write_one(record);
+}
+
+static int dispatcher_clear_one(uint8_t slot, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return binding_table_clear_one(slot);
+}
+
+static int dispatcher_insert_at(uint8_t slot, const vbrk_slot_record_t *record,
+                                void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return binding_table_insert_at(slot, record);
+}
+
+static int dispatcher_remove_at(uint8_t slot, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return binding_table_remove_at(slot);
+}
+
+static int dispatcher_move_block(uint8_t from, uint8_t to, uint8_t len, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return binding_table_move_block(from, to, len);
+}
+
+static int dispatcher_set_qty(uint8_t slot, uint16_t qty, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return binding_table_set_qty(slot, qty);
+}
+
+static int dispatcher_factory_reset(uint32_t magic, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return binding_table_factory_reset(magic);
+}
+
+static int dispatcher_notify_binding(uint8_t op, uint8_t status, const void *payload,
+                                     uint16_t len, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return app_ble_notify_binding_result(op, status, payload, len);
+}
+
+static void dispatcher_table_changed(void *user_data)
+{
+    ARG_UNUSED(user_data);
+    (void)app_ble_notify_table_info();
+    app_ble_refresh_advertising();
+}
+
 static ssize_t binding_cp_write(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                 const void *buf, uint16_t len, uint16_t offset,
                                 uint8_t flags)
 {
     const uint8_t *frame = buf;
-    uint8_t op;
-    int err = 0;
+    vbrk_ble_dispatcher_t dispatcher = {
+        .read_one = dispatcher_read_one,
+        .write_one = dispatcher_write_one,
+        .clear_one = dispatcher_clear_one,
+        .insert_at = dispatcher_insert_at,
+        .remove_at = dispatcher_remove_at,
+        .move_block = dispatcher_move_block,
+        .set_qty = dispatcher_set_qty,
+        .factory_reset = dispatcher_factory_reset,
+        .notify_binding = dispatcher_notify_binding,
+        .table_changed = dispatcher_table_changed,
+        .user_data = NULL,
+    };
 
     ARG_UNUSED(conn);
     ARG_UNUSED(attr);
@@ -136,100 +193,7 @@ static ssize_t binding_cp_write(struct bt_conn *conn, const struct bt_gatt_attr 
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
     }
 
-    op = frame[0];
-
-    switch (op) {
-    case VBRK_OP_READ_ONE: {
-        vbrk_slot_record_t record;
-
-        if (len != 2) {
-            err = -EINVAL;
-            break;
-        }
-
-        err = binding_table_read_one(frame[1], &record);
-        app_ble_notify_binding_result(op, status_from_errno(err), &record, err == 0 ? sizeof(record) : 0);
-        return len;
-    }
-    case VBRK_OP_READ_ALL: {
-        vbrk_slot_record_t record;
-        uint8_t end_marker = VBRK_READ_ALL_END_MARKER;
-
-        if (len != 1) {
-            err = -EINVAL;
-            break;
-        }
-
-        for (uint8_t slot = 1; slot <= VBRK_SLOT_COUNT; slot++) {
-            err = binding_table_read_one(slot, &record);
-            app_ble_notify_binding_result(op, status_from_errno(err), &record, err == 0 ? sizeof(record) : 0);
-            if (err != 0) {
-                return len;
-            }
-        }
-        app_ble_notify_binding_result(op, VBRK_STATUS_OK, &end_marker, sizeof(end_marker));
-        return len;
-    }
-    case VBRK_OP_WRITE_ONE:
-        if (len != 1 + VBRK_SLOT_RECORD_SIZE) {
-            err = -EINVAL;
-            break;
-        }
-        err = binding_table_write_one((const vbrk_slot_record_t *)&frame[1]);
-        break;
-    case VBRK_OP_CLEAR_ONE:
-        if (len != 2) {
-            err = -EINVAL;
-            break;
-        }
-        err = binding_table_clear_one(frame[1]);
-        break;
-    case VBRK_OP_INSERT_AT:
-        if (len != 2 + VBRK_SLOT_RECORD_SIZE) {
-            err = -EINVAL;
-            break;
-        }
-        err = binding_table_insert_at(frame[1], (const vbrk_slot_record_t *)&frame[2]);
-        break;
-    case VBRK_OP_REMOVE_AT:
-        if (len != 2) {
-            err = -EINVAL;
-            break;
-        }
-        err = binding_table_remove_at(frame[1]);
-        break;
-    case VBRK_OP_MOVE_BLOCK:
-        if (len != 4) {
-            err = -EINVAL;
-            break;
-        }
-        err = binding_table_move_block(frame[1], frame[2], frame[3]);
-        break;
-    case VBRK_OP_SET_QTY:
-        if (len != 4) {
-            err = -EINVAL;
-            break;
-        }
-        err = binding_table_set_qty(frame[1], sys_get_le16(&frame[2]));
-        break;
-    case VBRK_OP_FACTORY_RESET:
-        if (len != 5) {
-            err = -EINVAL;
-            break;
-        }
-        err = binding_table_factory_reset(sys_get_le32(&frame[1]));
-        break;
-    default:
-        err = -EINVAL;
-        break;
-    }
-
-    app_ble_notify_binding_result(op, status_from_errno(err), NULL, 0);
-    if (err == 0) {
-        app_ble_notify_table_info();
-        app_ble_refresh_advertising();
-    }
-
+    (void)vbrk_ble_dispatch_binding_cp(&dispatcher, frame, len);
     return len;
 }
 

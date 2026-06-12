@@ -14,6 +14,7 @@ target_sources(app PRIVATE
   src/binding_table.c
   src/light_control.c
   src/nfc_wake.c
+  ../../../protocol/viberack_ble_dispatcher_model.c
   ../../../protocol/viberack_binding_table_model.c
   ../../../protocol/viberack_light_frame.c
   ../../../protocol/viberack_light_policy.c
