@@ -8,7 +8,7 @@
 
 - 低占空广播、快速广播、已连接、点灯中四态机。
 - NT3H2111 FD 引脚唤醒，使用 GPIOTE PORT 事件。
-- 绑定表持久化，使用 FDS 写穿。
+- 绑定表持久化，使用 Zephyr settings/NVS snapshot。
 - 灯效输出禁止 GPIO bit-bang。XIAO 开发板当前使用 Zephyr `worldsemi,ws2812-spi`；回到 nRF52832 目标硬件时再按引脚、功耗和资源复核 SPI/I2S/PWM 方案。
 - Secure DFU 双区 OTA。
 

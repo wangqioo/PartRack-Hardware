@@ -92,6 +92,6 @@
 
 | 日期 | 决策 | 影响文档 | 后续动作 |
 |---|---|---|---|
-| 2026-06-13 | 四轨并行推进：总集成、硬件打样、APP 契约、固件质量 | `docs/superpowers/specs/2026-06-13-partrack-parallel-development-design.md` | 执行 Batch 1 |
-| 2026-06-13 | 增加 M0，避免 NFC 阻塞 BLE/灯控最小闭环 | `docs/milestones.md` | 补 M0 验收清单 |
+| 2026-06-13 | 总集成控制 + 三轨并行推进：硬件打样、APP 契约、固件质量 | `docs/superpowers/specs/2026-06-13-partrack-parallel-development-design.md` | 执行 Batch 1 |
+| 2026-06-13 | 增加 M0，避免 NFC 阻塞 BLE/灯控最小闭环 | `docs/milestones.md` | 用 M0 口径同步后续验证记录 |
 | 2026-06-13 | 当前存储实现按 Zephyr settings/NVS 表述 | `README.md`, `docs/milestones.md`, `docs/development-plan.md` | 清理旧 FDS 口径 |
