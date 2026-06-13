@@ -43,6 +43,11 @@ run_host_checks() {
   /tmp/storage_snapshot_test
 
   cc -std=c11 -Wall -Wextra -Iprotocol \
+    tools/adv_payload_test.c protocol/viberack_adv_payload.c \
+    -o /tmp/adv_payload_test
+  /tmp/adv_payload_test
+
+  cc -std=c11 -Wall -Wextra -Iprotocol \
     tools/binding_table_core_test.c protocol/viberack_protocol.c protocol/viberack_binding_table_model.c \
     -o /tmp/binding_table_core_test
   /tmp/binding_table_core_test

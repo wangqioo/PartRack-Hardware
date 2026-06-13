@@ -15,6 +15,7 @@
 
 #include "binding_table.h"
 #include "light_control.h"
+#include "viberack_adv_payload.h"
 #include "viberack_ble_dispatcher_model.h"
 
 LOG_MODULE_REGISTER(app_ble, LOG_LEVEL_INF);
@@ -40,30 +41,21 @@ static struct bt_uuid_128 light_service_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_LIG
 static struct bt_uuid_128 light_command_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_LIGHT_COMMAND);
 static struct bt_uuid_128 light_status_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_LIGHT_STATUS);
 
-static uint8_t adv_msd[11];
+static uint8_t adv_msd[VBRK_ADV_MSD_SIZE];
 
 static void fill_adv_msd(void)
 {
-    uint8_t flags = 0;
+    vbrk_adv_payload_input_t input = {
+        .company_id = VBRK_DEV_COMPANY_ID,
+        .batch_id = 1,
+        .battery_pct = battery_pct,
+        .table_seq = binding_table_seq(),
+        .has_unbound_slot = binding_table_has_unbound_slot(),
+        .light_active = light_active,
+        .fault = false,
+    };
 
-    if (battery_pct <= 15) {
-        flags |= VBRK_ADV_LOW_BATTERY;
-    }
-    if (binding_table_has_unbound_slot()) {
-        flags |= VBRK_ADV_HAS_UNBOUND_SLOT;
-    }
-    if (light_active) {
-        flags |= VBRK_ADV_LIGHT_ACTIVE;
-    }
-
-    sys_put_le16(VBRK_DEV_COMPANY_ID, &adv_msd[0]);
-    adv_msd[2] = VBRK_PROTO_VER;
-    sys_put_le16(1, &adv_msd[3]); /* TODO: assign real batch_id at factory bind. */
-    adv_msd[5] = battery_pct;
-    adv_msd[6] = flags;
-    sys_put_le16((uint16_t)binding_table_seq(), &adv_msd[7]);
-    adv_msd[9] = 0;
-    adv_msd[10] = 0;
+    vbrk_adv_payload_build(adv_msd, &input);
 }
 
 static const struct bt_data ad[] = {
