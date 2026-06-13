@@ -19,6 +19,7 @@ target_sources(app PRIVATE
   ../../../protocol/viberack_binding_table_model.c
   ../../../protocol/viberack_light_frame.c
   ../../../protocol/viberack_light_policy.c
+  ../../../protocol/viberack_light_state.c
   ../../../protocol/viberack_protocol.c
   ../../../protocol/viberack_storage.c
 )

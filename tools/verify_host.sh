@@ -38,6 +38,11 @@ run_host_checks() {
   /tmp/light_policy_test
 
   cc -std=c11 -Wall -Wextra -Iprotocol \
+    tools/light_state_test.c protocol/viberack_protocol.c protocol/viberack_light_policy.c protocol/viberack_light_state.c \
+    -o /tmp/light_state_test
+  /tmp/light_state_test
+
+  cc -std=c11 -Wall -Wextra -Iprotocol \
     tools/storage_snapshot_test.c protocol/viberack_protocol.c protocol/viberack_storage.c \
     -o /tmp/storage_snapshot_test
   /tmp/storage_snapshot_test

@@ -13,6 +13,7 @@
 #include "app_ble.h"
 #include "viberack_light_frame.h"
 #include "viberack_light_policy.h"
+#include "viberack_light_state.h"
 
 LOG_MODULE_REGISTER(light_control, LOG_LEVEL_INF);
 
@@ -30,8 +31,7 @@ static struct led_rgb strip_pixels[VBRK_SLOT_COUNT];
 #endif
 
 static struct k_work_delayable off_work;
-static uint8_t active_mode;
-static int64_t expires_at_ms;
+static vbrk_light_state_t light_state;
 static vbrk_light_frame_t active_frame;
 static vbrk_rgb_t active_pixels[VBRK_SLOT_COUNT];
 
@@ -146,11 +146,10 @@ static void off_work_handler(struct k_work *work)
 {
     ARG_UNUSED(work);
 
-    active_mode = VBRK_LIGHT_OFF;
-    expires_at_ms = 0;
+    vbrk_light_state_force_off(&light_state);
     drive_leds_off();
     app_ble_set_light_active(false);
-    app_ble_notify_light_status(active_mode, 0);
+    app_ble_notify_light_status(vbrk_light_state_mode(&light_state), 0);
     app_ble_refresh_advertising();
 }
 
@@ -168,8 +167,7 @@ int light_control_init(void)
     }
 
     k_work_init_delayable(&off_work, off_work_handler);
-    active_mode = VBRK_LIGHT_OFF;
-    expires_at_ms = 0;
+    vbrk_light_state_init(&light_state);
     drive_leds_off();
     return 0;
 }
@@ -179,7 +177,7 @@ int light_control_apply(const vbrk_light_command_t *command)
     vbrk_light_policy_t policy;
     int err;
 
-    err = vbrk_light_policy_resolve(command, &policy);
+    err = vbrk_light_state_apply(&light_state, command, k_uptime_get(), &policy);
     if (err != 0) {
         return err;
     }
@@ -192,11 +190,9 @@ int light_control_apply(const vbrk_light_command_t *command)
     }
 
     drive_leds_command(command);
-    active_mode = policy.mode;
-    expires_at_ms = k_uptime_get() + ((int64_t)policy.timeout_s * MSEC_PER_SEC);
 
     app_ble_set_light_active(true);
-    app_ble_notify_light_status(active_mode, policy.timeout_s);
+    app_ble_notify_light_status(vbrk_light_state_mode(&light_state), policy.timeout_s);
     app_ble_refresh_advertising();
     k_work_schedule(&off_work, K_SECONDS(policy.timeout_s));
 
@@ -205,21 +201,10 @@ int light_control_apply(const vbrk_light_command_t *command)
 
 uint8_t light_control_mode(void)
 {
-    return active_mode;
+    return vbrk_light_state_mode(&light_state);
 }
 
 uint16_t light_control_remaining_s(void)
 {
-    int64_t remaining_ms;
-
-    if (active_mode == VBRK_LIGHT_OFF || expires_at_ms == 0) {
-        return 0;
-    }
-
-    remaining_ms = expires_at_ms - k_uptime_get();
-    if (remaining_ms <= 0) {
-        return 0;
-    }
-
-    return (uint16_t)((remaining_ms + MSEC_PER_SEC - 1) / MSEC_PER_SEC);
+    return vbrk_light_state_remaining_s(&light_state, k_uptime_get());
 }
