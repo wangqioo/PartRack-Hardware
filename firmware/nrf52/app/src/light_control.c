@@ -159,9 +159,7 @@ static void off_work_handler(struct k_work *work)
 
     vbrk_light_state_force_off(&light_state);
     drive_leds_off();
-    app_ble_set_light_active(false);
-    app_ble_notify_light_status(vbrk_light_state_mode(&light_state), 0);
-    app_ble_refresh_advertising();
+    app_ble_report_light_changed();
 }
 
 int light_control_init(void)
@@ -207,9 +205,7 @@ int light_control_apply(const vbrk_light_command_t *command)
 
     drive_leds_command(command);
 
-    app_ble_set_light_active(true);
-    app_ble_notify_light_status(vbrk_light_state_mode(&light_state), policy.timeout_s);
-    app_ble_refresh_advertising();
+    app_ble_report_light_changed();
     k_work_schedule(&off_work, K_SECONDS(policy.timeout_s));
 
     return 0;

@@ -31,7 +31,7 @@ static void nfc_fd_handler(const struct device *dev, struct gpio_callback *cb, u
 
     last_fd_ms = now;
     LOG_INF("NFC field detect wake");
-    app_ble_refresh_advertising();
+    app_ble_report_nfc_fd();
 }
 #endif
 

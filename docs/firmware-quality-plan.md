@@ -2,6 +2,8 @@
 
 本文档定义 PartRack-Hardware 固件证据边界。host/model/build 通过不能替代真实硬件验证。
 
+当前证据状态的单一事实源见 [verification-matrix.md](verification-matrix.md)。本文只定义证据边界和测试入口。
+
 ## 已有 host 验证
 
 | 文件 | 覆盖 |
@@ -11,6 +13,7 @@
 | `tools/adv_payload_test.c` | 广播 manufacturer data 的 company id、proto_ver、battery、status flags、`table_seq` 低 16 位 |
 | `tools/binding_table_core_test.c` | 绑定表 write/read/clear/insert/remove/move/set qty/factory reset、`table_seq`、CRC 拒绝、保存失败原子性 |
 | `tools/ble_dispatcher_model_test.c` | Binding Control Point opcode 长度、状态码、notify payload、`READ_ALL` end marker、Table Info notify |
+| `tools/ble_lifecycle_test.c` | BLE lifecycle 状态、广播 dirty/coalesce、connected/deconnected 行为、notify 在线规则 |
 | `tools/light_policy_test.c` | OFF、默认 30s、上限 300s、FX 上限 10s、非法 mode |
 | `tools/light_state_test.c` | fake time 下的超时、remaining、OFF、重复命令刷新 |
 | `tools/light_frame_test.c` | mask 着色、B 覆盖 A、越界 bit、active slot 统计 |
@@ -28,7 +31,10 @@
 
 ## Zephyr build 验证
 
-`tools/verify_host.sh --full-build` 应运行 host tests、Python tests、`git diff --check` 和 Zephyr build。构建成功只证明代码能编译进目标应用，不证明真实 BLE、灯条、NFC 或功耗行为。
+`tools/verify_host.sh --full-build` 应运行 host tests、Python tests、`git diff --check`、裸 XIAO build 和外设启用 XIAO build。构建成功只证明代码能编译进目标应用、对应 devicetree variant 可生成，不证明真实 BLE、灯条、NFC 或功耗行为。
+
+- `--bare-build`：裸 XIAO BLE 验证 variant，确认未启用 PartRack 外设节点。
+- `--peripheral-build`：加载 `xiao_ble_part_rack.dtsi`，确认 WS2812、灯条电源门控和 NFC FD 节点存在并可构建。
 
 ## 必须实机验证
 

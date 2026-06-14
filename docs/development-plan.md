@@ -32,6 +32,11 @@
 - 已新增电脑侧 BLE/GATT 烟测辅助脚本：`tools/ble_gatt_smoke_test.py`。
 - BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录、`READ_ALL` 结束帧、`SET_QTY` 状态 notify，并可选执行 `CLEAR_ONE` / `FACTORY_RESET`；当前本机运行真实 BLE 烟测阻塞在 macOS CoreBluetooth 后端不可用，未进入设备扫描阶段。
 - 已新增本机一键验证脚本：`tools/verify_host.sh`。
+- 已新增验证证据台账：[verification-matrix.md](verification-matrix.md)，后续 host/model/build/hardware 证据状态以该台账为准。
+- 已实现 BLE lifecycle host model：
+  - BLE 初始化、连接状态、广播 dirty 状态、断开后重启广播、运行期刷新失败保留 dirty 状态均有 host-side 覆盖。
+  - Binding Table、灯控和 NFC FD 只上报状态变化，不直接调用 Zephyr Bluetooth 广播刷新。
+  - Binding Control Point 结果 notify 保持同步顺序，成功变更后再报告 Table Info 变化。
 - 已实现 Binding Table settings/NVS 持久化：
   - 25 个槽位和 `table_seq` 会编码为带 magic/version/CRC16 的 snapshot。
   - 固件启动时通过 Zephyr settings 读取 `vbrk/binding_table`。
@@ -50,15 +55,17 @@
   - `vbrk_light_frame_copy_pixels()` 会把 25 槽 RGB frame 转为输出像素数组，并统计 active slot 数。
   - 固件已有可选 Zephyr `led_strip` 输出路径：存在 `vbrk-led-strip` devicetree alias 时调用 `led_strip_update_rgb()`。
 - 已完成 XIAO nRF52840 Sense 的 WS2812 devicetree 绑定：
-  - `xiao_ble_nrf52840_sense.overlay` 会加载项目共享的 `xiao_ble_part_rack.dtsi`。
-  - `vbrk_ws2812` 使用 Zephyr 官方 `worldsemi,ws2812-spi` 驱动，25 像素，GRB 顺序，4 MHz SPI，`0x70/0x40` 符号。
-  - Zephyr 构建已确认编入 `ws2812_spi.c`、`spi_nrfx_spim.c` 和 `nrfx_spim.c`。
+  - 默认 `xiao_ble_nrf52840_sense.overlay` 是裸板 BLE 验证 variant，不加载外接灯条/NFC 外设。
+  - `tools/verify_host.sh --peripheral-build` 会额外加载项目共享的 `xiao_ble_part_rack.dtsi`。
+  - peripheral build 中 `vbrk_ws2812` 使用 Zephyr 官方 `worldsemi,ws2812-spi` 驱动，25 像素，GRB 顺序，4 MHz SPI，`0x70/0x40` 符号。
+  - Zephyr 构建已确认 peripheral variant 编入 `ws2812_spi.c`、`spi_nrfx_spim.c` 和 `nrfx_spim.c`。
 
 当前仍未完成：
 
 - Binding Table 的 `WRITE_ONE -> READ_ONE` 还需要完整 notify 闭环验证。
 - Binding Table 持久化固件已烧录到 XIAO nRF52840 Sense，仍需做“写入 -> 重启 -> 读回”的手机实机确认。
 - 灯控已有 GATT 接口、状态框架、电源门控、25 槽 RGB 帧生成和 XIAO 上的 Zephyr WS2812 SPI 输出绑定，仍需接真实 25 颗 WS2812 灯条实测。
+- BLE lifecycle 已 host/build verified；真实配对、订阅、notify 时序、断开重连和 radio 行为仍需实机验证。
 - NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
 
 下一步优先级：
@@ -126,6 +133,7 @@ APP 同学主要看这几份文档：
 - 固定基础错误码。
 - 输出协议头文件、协议校验脚本和 nRF Connect 手工测试帧。
 - 输出 BLE/GATT 烟测脚本的闭环校验逻辑。
+- 输出 BLE lifecycle host model 测试。
 
 待办：
 
@@ -137,6 +145,7 @@ APP 同学主要看这几份文档：
 - [ble-protocol-v0.1.md](ble-protocol-v0.1.md)
 - `protocol/viberack_protocol.h`
 - `tools/protocol_check.py`
+- `tools/ble_lifecycle_test.c`
 
 ## 阶段 1：固件最小闭环
 
@@ -161,6 +170,7 @@ APP 同学主要看这几份文档：
 - 灯控策略 host-side 测试：默认 30s、最大 300s、FX 最大 10s、OFF 断电、非法 mode 拒绝。
 - 灯控帧 host-side 测试：OFF 清空、A/B mask 着色、B 覆盖 A、越界 bit 忽略。
 - 灯控像素 host-side 测试：frame copy、active slot 统计、非法参数和 buffer 长度拒绝。
+- BLE lifecycle host-side 测试：NFC FD 事件延迟处理、connected 状态不刷新广播、disconnect 后重启广播、notify 失败不回滚 domain 操作。
 
 已完成实机验证：
 
@@ -171,6 +181,7 @@ APP 同学主要看这几份文档：
 - `Light Status` 读取通过，空闲状态返回 `0000 00`。
 - 断开连接后设备会恢复广播。
 - `tools/ble_gatt_smoke_test.py` 已生成并校验 `WRITE_ONE`、`READ_ONE`、`READ_ALL`、灯控命令测试帧。
+- `tools/verify_host.sh --bare-build` 已通过裸 XIAO Sense Zephyr build；`--peripheral-build` 已通过外设启用 build。构建通过只证明固件可编译和 DTS 节点存在，不证明真实灯条/NFC 硬件通过。
 
 当前待验证：
 

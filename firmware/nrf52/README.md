@@ -75,10 +75,18 @@ NT3H2111 I2C SCL  -> D5 / P0.05
 
 ## 构建
 
-安装 nRF Connect SDK 后，在 NCS workspace 中优先构建 XIAO nRF52840 Sense：
+安装 nRF Connect SDK 后，当前 XIAO nRF52840 Sense 有两个构建 variant。
+
+裸板 BLE 验证构建：
 
 ```bash
-west build -b xiao_ble/nrf52840/sense /path/to/PartRack-Hardware/firmware/nrf52/app
+tools/verify_host.sh --bare-build
+```
+
+外设启用构建，会加载 `boards/xiao_ble_part_rack.dtsi` 并编译 WS2812、灯条电源门控和 NFC FD adapter：
+
+```bash
+tools/verify_host.sh --peripheral-build
 ```
 
 普通 XIAO nRF52840 可使用：
@@ -101,7 +109,15 @@ west build -b nrf52dk_nrf52832 firmware/nrf52/app
 tools/verify_host.sh
 ```
 
-该脚本会运行协议/模型/烟测向量测试、`git diff --check` 和 XIAO nRF52840 Sense Zephyr 构建。
+该脚本会运行协议/模型/烟测向量测试、`git diff --check`、裸 XIAO nRF52840 Sense Zephyr 构建和外设启用 Zephyr 构建。
+
+BLE lifecycle 已抽为 host-testable model。固件启动顺序为：
+
+```text
+初始化 domain modules -> bt_enable() -> settings_load() -> 初始 advertising
+```
+
+Binding Table、灯控和 NFC FD 模块只上报状态变化，BLE lifecycle 模块统一处理 advertising dirty/coalesce、断开后重启 advertising 和 GATT notify。
 
 ## 烧录
 

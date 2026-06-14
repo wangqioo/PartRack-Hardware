@@ -196,6 +196,33 @@ BLE backend is unavailable: CoreBluetooth reported 'BLE is unsupported'.
 
 该错误发生在 macOS CoreBluetooth 后端初始化阶段，尚未进入 BLE 扫描，不能作为固件或设备广播失败判断。
 
+## 2026-06-15 BLE lifecycle 和构建 variant 记录
+
+当前固件将 BLE lifecycle 集中到 host-testable model：
+
+- Binding Table、灯控和 NFC FD 只上报状态变化，不直接调用 Zephyr Bluetooth 广播刷新。
+- `main.c` 显式执行 `bt_enable()`、`settings_load()`、初始 advertising start。
+- 断开连接后的 advertising restart、connected 状态下的 advertising dirty 延迟、notify 失败不回滚 domain 操作均有 host-side 覆盖。
+
+当前 XIAO 构建分为两个 variant：
+
+```bash
+tools/verify_host.sh --bare-build
+tools/verify_host.sh --peripheral-build
+```
+
+- `--bare-build`：裸 XIAO BLE 验证，不加载外接 WS2812、灯条电源门控和 NFC FD。
+- `--peripheral-build`：额外加载 `firmware/nrf52/app/boards/xiao_ble_part_rack.dtsi`，编译 WS2812 SPI、灯条电源门控和 NFC FD adapter。
+
+2026-06-15 本机验证结果：
+
+- `tools/verify_host.sh --host-only` 通过。
+- `tools/verify_host.sh --bare-build` 通过，生成 `build-partrack-PartRack-Hardware-xiao-sense-bare`，脚本确认 DTS 不含 PartRack 外设节点。
+- `tools/verify_host.sh --peripheral-build` 通过，生成 `build-partrack-PartRack-Hardware-xiao-sense-peripherals`，脚本确认 DTS 含 `vbrk_ws2812`、`vbrk-led-strip`、`vbrk-nfc-fd`。
+- peripheral build 编入 `ws2812_spi.c`、`spi_nrfx_spim.c` 和 `nrfx_spim.c`。
+
+这些结果是 host/build 证据，不替代真实 BLE notify、真实 WS2812 灯条、真实 NFC 或功耗实测。
+
 ## 2026-06-12 Binding Table 持久化记录
 
 已完成固件侧 settings/NVS 持久化初版：

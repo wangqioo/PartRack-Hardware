@@ -2,6 +2,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
 
 #include "app_ble.h"
 #include "binding_table.h"
@@ -49,6 +50,16 @@ static void blink_status(const struct gpio_dt_spec *led, int count, int on_ms, i
     }
 }
 
+static int fatal_ble_error(int err)
+{
+    status_led_set(&led_green, false);
+    while (true) {
+        blink_status(&led_red, 3, 200, 200);
+        k_msleep(1000);
+    }
+    return err;
+}
+
 int main(void)
 {
     int err;
@@ -83,15 +94,24 @@ int main(void)
         LOG_WRN("nfc wake init failed: %d", err);
     }
 
-    err = app_ble_start();
+    err = app_ble_init();
     if (err != 0) {
         LOG_ERR("ble start failed: %d", err);
-        status_led_set(&led_green, false);
-        while (true) {
-            blink_status(&led_red, 3, 200, 200);
-            k_msleep(1000);
+        return fatal_ble_error(err);
+    }
+
+    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
+        err = settings_load();
+        if (err != 0) {
+            LOG_ERR("settings load failed: %d", err);
+            return fatal_ble_error(err);
         }
-        return err;
+    }
+
+    err = app_ble_start();
+    if (err != 0) {
+        LOG_ERR("ble advertising start failed: %d", err);
+        return fatal_ble_error(err);
     }
 
     status_led_set(&led_red, false);

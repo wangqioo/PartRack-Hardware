@@ -8,15 +8,16 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/hci.h>
+#include <zephyr/irq.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/settings/settings.h>
 #include <zephyr/sys/byteorder.h>
 
 #include "binding_table.h"
 #include "light_control.h"
 #include "viberack_adv_payload.h"
 #include "viberack_ble_dispatcher_model.h"
+#include "viberack_ble_lifecycle.h"
 
 LOG_MODULE_REGISTER(app_ble, LOG_LEVEL_INF);
 
@@ -31,8 +32,9 @@ void app_status_set_ble_connected(bool connected);
 #define VBRK_BT_UUID_LIGHT_STATUS BT_UUID_128_ENCODE(0x7f4b2002, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
 
 static struct bt_conn *current_conn;
-static bool light_active;
 static uint8_t battery_pct = 100;
+static vbrk_ble_lifecycle_t ble_lifecycle;
+static struct k_work ble_lifecycle_work;
 
 static struct bt_uuid_128 binding_service_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_BINDING_SERVICE);
 static struct bt_uuid_128 binding_cp_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_BINDING_CP);
@@ -43,6 +45,30 @@ static struct bt_uuid_128 light_status_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_LIGH
 
 static uint8_t adv_msd[VBRK_ADV_MSD_SIZE];
 
+static void ble_lifecycle_work_handler(struct k_work *work)
+{
+    ARG_UNUSED(work);
+    vbrk_ble_lifecycle_process(&ble_lifecycle);
+}
+
+static unsigned int lifecycle_lock(void *user_data)
+{
+    ARG_UNUSED(user_data);
+    return irq_lock();
+}
+
+static void lifecycle_unlock(unsigned int key, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    irq_unlock(key);
+}
+
+static void lifecycle_schedule_work(void *user_data)
+{
+    ARG_UNUSED(user_data);
+    (void)k_work_submit(&ble_lifecycle_work);
+}
+
 static void fill_adv_msd(void)
 {
     vbrk_adv_payload_input_t input = {
@@ -51,7 +77,7 @@ static void fill_adv_msd(void)
         .battery_pct = battery_pct,
         .table_seq = binding_table_seq(),
         .has_unbound_slot = binding_table_has_unbound_slot(),
-        .light_active = light_active,
+        .light_active = light_control_mode() != VBRK_LIGHT_OFF,
         .fault = false,
     };
 
@@ -67,10 +93,18 @@ static const struct bt_data sd[] = {
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
 
-static int start_advertising(void)
+static int lifecycle_apply_advertising(bool restart, void *user_data)
 {
+    ARG_UNUSED(user_data);
+
     fill_adv_msd();
-    return bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+
+    if (restart) {
+        return bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad),
+                               sd, ARRAY_SIZE(sd));
+    }
+
+    return bt_le_adv_update_data(ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 }
 
 static ssize_t table_info_read(struct bt_conn *conn, const struct bt_gatt_attr *attr,
@@ -154,8 +188,7 @@ static int dispatcher_notify_binding(uint8_t op, uint8_t status, const void *pay
 static void dispatcher_table_changed(void *user_data)
 {
     ARG_UNUSED(user_data);
-    (void)app_ble_notify_table_info();
-    app_ble_refresh_advertising();
+    app_ble_report_binding_changed();
 }
 
 static ssize_t binding_cp_write(struct bt_conn *conn, const struct bt_gatt_attr *attr,
@@ -246,14 +279,13 @@ static void connected(struct bt_conn *conn, uint8_t err)
     }
 
     current_conn = bt_conn_ref(conn);
+    vbrk_ble_lifecycle_connected(&ble_lifecycle);
     app_status_set_ble_connected(true);
     LOG_INF("connected");
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-    int err;
-
     ARG_UNUSED(conn);
 
     LOG_INF("disconnected: %u", reason);
@@ -261,12 +293,8 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
         bt_conn_unref(current_conn);
         current_conn = NULL;
     }
+    vbrk_ble_lifecycle_disconnected(&ble_lifecycle);
     app_status_set_ble_connected(false);
-
-    err = start_advertising();
-    if (err != 0) {
-        LOG_ERR("advertising restart failed: %d", err);
-    }
 }
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -274,9 +302,12 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
     .disconnected = disconnected,
 };
 
-int app_ble_notify_binding_result(uint8_t op, uint8_t status, const void *payload, uint16_t len)
+static int lifecycle_notify_binding(uint8_t op, uint8_t status, const void *payload,
+                                    uint16_t len, void *user_data)
 {
     uint8_t frame[2 + VBRK_SLOT_RECORD_SIZE];
+
+    ARG_UNUSED(user_data);
 
     if (current_conn == NULL || len > VBRK_SLOT_RECORD_SIZE) {
         return -ENOTCONN;
@@ -291,9 +322,11 @@ int app_ble_notify_binding_result(uint8_t op, uint8_t status, const void *payloa
     return bt_gatt_notify(current_conn, &binding_svc.attrs[2], frame, 2 + len);
 }
 
-int app_ble_notify_table_info(void)
+static int lifecycle_notify_table_info(void *user_data)
 {
     vbrk_table_info_t info;
+
+    ARG_UNUSED(user_data);
 
     if (current_conn == NULL) {
         return -ENOTCONN;
@@ -303,9 +336,12 @@ int app_ble_notify_table_info(void)
     return bt_gatt_notify(current_conn, &binding_svc.attrs[5], &info, sizeof(info));
 }
 
-int app_ble_notify_light_status(uint8_t mode, uint16_t remaining_s)
+static int lifecycle_notify_light_status(uint8_t mode, uint16_t remaining_s,
+                                         void *user_data)
 {
     uint8_t status[3];
+
+    ARG_UNUSED(user_data);
 
     if (current_conn == NULL) {
         return -ENOTCONN;
@@ -316,45 +352,64 @@ int app_ble_notify_light_status(uint8_t mode, uint16_t remaining_s)
     return bt_gatt_notify(current_conn, &light_svc.attrs[4], status, sizeof(status));
 }
 
-void app_ble_set_light_active(bool active)
+int app_ble_notify_binding_result(uint8_t op, uint8_t status, const void *payload, uint16_t len)
 {
-    light_active = active;
+    return vbrk_ble_lifecycle_notify_binding(&ble_lifecycle, op, status,
+                                             payload, len);
 }
 
-void app_ble_refresh_advertising(void)
+void app_ble_report_binding_changed(void)
 {
-    int err;
-
-    fill_adv_msd();
-    err = bt_le_adv_update_data(ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-    if (err != 0) {
-        LOG_DBG("adv update skipped: %d", err);
-    }
+    vbrk_ble_lifecycle_report_binding_changed(&ble_lifecycle);
 }
 
-int app_ble_start(void)
+void app_ble_report_light_changed(void)
 {
+    vbrk_ble_lifecycle_report_light_changed(&ble_lifecycle,
+                                            light_control_mode(),
+                                            light_control_remaining_s());
+}
+
+void app_ble_report_nfc_fd(void)
+{
+    vbrk_ble_lifecycle_report_nfc_fd(&ble_lifecycle);
+}
+
+int app_ble_init(void)
+{
+    vbrk_ble_lifecycle_adapter_t adapter = {
+        .lock = lifecycle_lock,
+        .unlock = lifecycle_unlock,
+        .schedule_work = lifecycle_schedule_work,
+        .apply_advertising = lifecycle_apply_advertising,
+        .notify_binding = lifecycle_notify_binding,
+        .notify_table_info = lifecycle_notify_table_info,
+        .notify_light_status = lifecycle_notify_light_status,
+        .user_data = NULL,
+    };
     int err;
+
+    k_work_init(&ble_lifecycle_work, ble_lifecycle_work_handler);
+    vbrk_ble_lifecycle_init(&ble_lifecycle, &adapter);
 
     err = bt_enable(NULL);
     if (err != 0) {
         return err;
     }
 
+    vbrk_ble_lifecycle_bluetooth_initialized(&ble_lifecycle);
     LOG_INF("Bluetooth initialized");
-
-    if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-        err = settings_load();
-        if (err != 0) {
-            return err;
-        }
-    }
-
-    err = start_advertising();
-    if (err != 0) {
-        return err;
-    }
-
-    LOG_INF("advertising started");
     return 0;
+}
+
+int app_ble_start(void)
+{
+    int err;
+
+    err = vbrk_ble_lifecycle_start(&ble_lifecycle);
+    if (err == 0) {
+        LOG_INF("advertising started");
+    }
+
+    return err;
 }

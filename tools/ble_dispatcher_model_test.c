@@ -14,6 +14,8 @@ typedef struct {
     uint16_t lens[MAX_NOTIFIES];
     uint8_t count;
     uint8_t table_info_count;
+    uint8_t callback_order[MAX_NOTIFIES];
+    uint8_t callback_order_count;
     uint8_t read_fail_slot;
     int notify_result;
     int write_result;
@@ -132,6 +134,8 @@ static int fake_notify_binding(uint8_t op, uint8_t status, const void *payload,
     }
     fake->lens[fake->count] = (uint16_t)(2 + len);
     fake->count++;
+    assert(fake->callback_order_count < sizeof(fake->callback_order));
+    fake->callback_order[fake->callback_order_count++] = 1;
     return fake->notify_result;
 }
 
@@ -140,6 +144,8 @@ static void fake_table_changed(void *user_data)
     fake_ble_t *fake = user_data;
 
     fake->table_info_count++;
+    assert(fake->callback_order_count < sizeof(fake->callback_order));
+    fake->callback_order[fake->callback_order_count++] = 2;
 }
 
 static vbrk_ble_dispatcher_t make_dispatcher(fake_ble_t *fake)
@@ -258,6 +264,9 @@ static void test_write_success_and_crc_failure(void)
     assert(vbrk_ble_dispatch_binding_cp(&dispatcher, frame, sizeof(frame)) == 0);
     assert_notify(&fake, 0, VBRK_OP_WRITE_ONE, VBRK_STATUS_OK, 2);
     assert(fake.table_info_count == 1);
+    assert(fake.callback_order_count == 2);
+    assert(fake.callback_order[0] == 1);
+    assert(fake.callback_order[1] == 2);
 
     reset_fake(&fake);
     dispatcher = make_dispatcher(&fake);
