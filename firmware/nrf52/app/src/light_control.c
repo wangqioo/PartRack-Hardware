@@ -34,6 +34,8 @@ static struct k_work_delayable off_work;
 static vbrk_light_state_t light_state;
 static vbrk_light_frame_t active_frame;
 static vbrk_rgb_t active_pixels[VBRK_SLOT_COUNT];
+static bool light_outputs_ready;
+static bool led_strip_ready;
 
 static int configure_light_outputs(void)
 {
@@ -77,6 +79,11 @@ static int configure_led_strip(void)
 
 static void set_light_outputs(bool power_on)
 {
+    if (!light_outputs_ready) {
+        ARG_UNUSED(power_on);
+        return;
+    }
+
 #if DT_HAS_ALIAS(vbrk_led_data)
     (void)gpio_pin_set_dt(&led_data_gpio, 0);
 #endif
@@ -93,6 +100,10 @@ static void show_active_pixels(uint8_t active_slots)
 
 #if DT_HAS_ALIAS(vbrk_led_strip)
     int err;
+
+    if (!led_strip_ready) {
+        return;
+    }
 
     for (uint8_t i = 0; i < VBRK_SLOT_COUNT; i++) {
         strip_pixels[i].r = active_pixels[i].r;
@@ -159,11 +170,16 @@ int light_control_init(void)
 
     err = configure_light_outputs();
     if (err != 0) {
-        return err;
+        LOG_WRN("light outputs unavailable, continuing without physical light output: %d", err);
+    } else {
+        light_outputs_ready = true;
     }
+
     err = configure_led_strip();
     if (err != 0) {
-        return err;
+        LOG_WRN("WS2812 LED strip unavailable, continuing without physical light output: %d", err);
+    } else {
+        led_strip_ready = true;
     }
 
     k_work_init_delayable(&off_work, off_work_handler);

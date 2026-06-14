@@ -1,1 +1,12 @@
-#include "xiao_ble_part_rack.dtsi"
+/*
+ * Bare XIAO validation overlay.
+ *
+ * The external PartRack peripherals in xiao_ble_part_rack.dtsi
+ * (WS2812 strip, strip power gate, NFC FD input) are intentionally
+ * disabled for the current naked development board. Keep BLE and
+ * board LEDs independent from optional external hardware.
+ *
+ * Re-enable the include below when the external strip/NFC hardware
+ * is connected and ready for bring-up.
+ */
+/* #include "xiao_ble_part_rack.dtsi" */

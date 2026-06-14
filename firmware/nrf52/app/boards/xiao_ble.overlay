@@ -1,1 +1,7 @@
-#include "xiao_ble_part_rack.dtsi"
+/*
+ * Bare XIAO validation overlay.
+ *
+ * External PartRack peripherals are optional during naked-board
+ * bring-up and must not block BLE startup.
+ */
+/* #include "xiao_ble_part_rack.dtsi" */
