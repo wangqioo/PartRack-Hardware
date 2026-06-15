@@ -65,10 +65,27 @@
 
 当前仍未完成：
 
-- Binding Table 单槽持久化已在 XIAO nRF52840 Sense 完成“写入 -> 单击 reset -> 读回”确认；多槽、移动/删除/清空类操作后的重启恢复仍需补证。
-- 灯控已有 GATT 接口、状态框架、电源门控、25 槽 RGB 帧生成和 XIAO 上的 Zephyr WS2812 SPI 输出绑定，仍需接真实 25 颗 WS2812 灯条实测。
-- BLE lifecycle 已 host/build verified，encrypted Binding CP、`WRITE_ONE -> READ_ONE`、paced `READ_ALL`、`SET_QTY` 读回和 Light Command 状态闭环已在 XIAO 实机通过；断开重连长稳、APP 侧配对重试和目标 nRF52832 radio 行为仍需复验。
-- NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
+- 绑定表破坏性操作实机闭环：`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`FACTORY_RESET` 已实现并有 host/model 证据，但还缺 XIAO 真实 BLE 端到端验证；多槽、移动/删除/清空类操作后的重启恢复也仍需补证。
+- 灯控硬件输出：GATT 接口、状态框架、电源门控、25 槽 RGB 帧生成和 XIAO Zephyr WS2812 SPI 输出绑定已完成；真实 D3/P0.29 电源门控、25 颗 WS2812 灯条颜色/槽位/超时熄灯仍需实测。
+- BLE/APP 侧复验：XIAO + Mac 已通过 encrypted Binding CP、`WRITE_ONE -> READ_ONE`、paced `READ_ALL`、`SET_QTY` 读回和 Light Command 状态闭环；Android APP 侧配对/加密重试、断开重连长稳、notify 订阅顺序和 nRF52832 radio 行为仍需复验。
+- NFC / NT3H2111：NFC FD GPIO 唤醒入口已实现并可编入 peripheral build，但 NT3H2111 I2C/NDEF、URI 写入和手机触碰路由尚未接入。
+- 电池 ADC、低功耗、OTA/DFU、nRF52832 目标迁移、复位原因上报和看门狗仍未完成。
+
+## 待开发队列
+
+| 优先级 | 工作项 | 当前状态 | 下一步动作 | 通过标准 | 依赖/备注 |
+|---:|---|---|---|---|---|
+| P0 | 破坏性绑定表验证窗口 | 命令已实现；非破坏性 BLE 批量验证和单槽重启恢复已通过。 | 扩展或使用 smoke 脚本执行 `CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`FACTORY_RESET`，每类操作后 `READ_ONE`/`READ_ALL` 校验，并在关键组合后单击 reset 再读回。 | 每个命令返回正确 status；槽位顺序/内容符合协议；Table Info seq/CRC 更新；重启后结果不回退。 | 会改测试数据，需明确测试窗口；先在 XIAO bare 固件做。 |
+| P0 | APP 侧 BLE 联调 | 固件侧 Mac/Bleak 已通过；APP 仓库独立维护。 | Android 实现或复验扫描、连接、service discovery、encrypted write retry、Binding CP notify、`READ_ALL` 结束帧、断开重连。 | APP 能完成最小闭环：写 slot1、读回、全表同步、改数量、灯控状态读取；遇到配对/加密错误可重试。 | 需要 Android 真机和 `Yrd980/LCSC_android_erp` 仓库配合。 |
+| P1 | 灯条电源门控实测 | D3/P0.29 P-MOS 控制代码和 peripheral build 已存在。 | 烧录 peripheral UF2，万用表/逻辑分析仪测 D3/P0.29：FIND/PICK/STOCK_IN 拉高，OFF/超时拉低。 | 非 OFF 后电源控制拉高；OFF 和超时后拉低；无外设 alias 的 bare build 不受影响。 | 需要接线或至少测开发板引脚。 |
+| P1 | 真实 WS2812 灯条验证 | 25 槽 frame、GRB、SPI backend 已实现并 build verified。 | 接 25 颗 WS2812：D2 -> DIN，D3 -> 电源门控，GND 共地；发送单槽、多槽、A/B 重叠、OFF、超时命令。 | 槽位 1-25 对应正确；颜色正确；B 覆盖 A；OFF/超时熄灯；供电无异常。 | 需要真实灯条和合适供电。 |
+| P1 | Light Status notify 和超时自动 OFF | 读取状态已通过；notify/超时路径未形成实机证据。 | 订阅 Light Status notify，发送 FIND 10s，观察 notify 和 10s 后 OFF。 | 收到 mode 1/remaining 更新；超时后回 `00 00 00`。 | 可先无灯条验证，再接真实灯条复验。 |
+| P2 | NFC FD + NT3H2111 I2C/NDEF | FD GPIO 入口已实现；I2C/NDEF 尚未接入。 | 接 NT3H2111，确认 I2C 地址和引脚，读取 tag memory，写入 `lcscerp://device?...` URI，验证手机触碰路由。 | 触碰触发 FD 唤醒/快速广播；手机可读 NDEF URI 并路由 APP。 | 需要 NT3H2111 硬件和手机 NFC。 |
+| P2 | 电池 ADC | 未接入。 | 按 XIAO 注意事项处理 `P0.14`/`P0.31`，实现电压读取、百分比估算、广播字段更新。 | 电压读数单调、范围合理；低电量 flag 可触发；不会让 `P0.31` 超限。 | 目标板分压方案回来后需复验。 |
+| P2 | 低功耗测量 | 未形成实测数据。 | 定义并实测广播、连接、灯条关闭、单槽/多槽/25 槽点亮电流。 | 电流数据进入验证矩阵；不达标项形成硬件/固件优化任务。 | 需要电源表或电流测量夹具。 |
+| P2 | nRF52832 目标迁移 | 当前主要证据来自 XIAO nRF52840 Sense。 | 在 `nrf52dk_nrf52832` 或目标板构建/烧录，复核 Flash/RAM、SPI/I2C/GPIO、BLE、settings 和灯条驱动方案。 | 目标芯片构建通过；关键 BLE/绑定表/灯控路径可运行；资源和功耗可接受。 | 首版主控决策依赖此项。 |
+| P3 | OTA / Secure DFU | 尚未集成。 | 决定 beta 是否必须 OTA；如需要，集成 MCUboot/DFU，验证升级、失败处理和回滚。 | 可从旧固件升级到新固件；失败不变砖；release gate 有记录。 | v1 release gate。 |
+| P3 | 复位原因上报和看门狗 | 尚未接入。 | 接入 reset reason 读取，定义 BLE/日志上报；设定 watchdog 策略并验证异常复位。 | 正常重启/看门狗复位可区分；异常复位后可从 BLE 或日志看到原因。 | 可在目标板迁移后一起做。 |
 
 下一步优先级：
 
@@ -113,7 +130,7 @@ APP 侧需要注意：
 - `CLEAR_ONE` 和 `FACTORY_RESET` 属于破坏性测试，只能在测试设备和测试数据上执行。
 - `VBRK-0000`、Company ID `0xFFFF`、`batch_id = 1` 都是开发期占位值，APP 不要写死为量产假设。
 - 当前 NFC URI、OTA 和电池 ADC 还没有接入，APP 先不要依赖这些能力。
-- Binding Table 持久化和 WS2812 灯条输出固件侧已实现，但仍需要真实设备完成“写入 -> 重启 -> 读回”和真实灯条颜色验证。
+- Binding Table 单槽持久化已在 XIAO 实机完成“写入 -> 重启 -> 读回”；多槽/破坏性操作恢复和真实灯条颜色验证仍需补证。
 
 APP 同学主要看这几份文档：
 
@@ -140,7 +157,7 @@ APP 同学主要看这几份文档：
 待办：
 
 - 固定 APP 侧重试策略。
-- 在可用 BLE 后端上跑通电脑侧自动 BLE/GATT 烟测。
+- 用 Android APP 复验电脑侧已通过的 BLE/GATT 最小闭环。
 
 交付物：
 
@@ -182,23 +199,24 @@ APP 同学主要看这几份文档：
 - `Table Info` 读取通过，实测返回 `0100 0000 2DE4 19`。
 - `Light Status` 读取通过，空闲状态返回 `0000 00`。
 - 断开连接后设备会恢复广播。
-- Mac CoreBluetooth/Bleak 自动烟测已验证 encrypted Binding CP：`WRITE_ONE -> READ_ONE`、paced `READ_ALL` 结束帧和 `SET_QTY` 状态 notify。
+- Mac CoreBluetooth/Bleak 自动烟测已验证 encrypted Binding CP：`WRITE_ONE -> READ_ONE`、paced `READ_ALL` 结束帧、`SET_QTY` 后读回、Table Info seq/CRC、Light Command 状态变化和单槽重启恢复。
 - `tools/ble_gatt_smoke_test.py` 已生成并校验 `WRITE_ONE`、`READ_ONE`、`READ_ALL`、灯控命令测试帧。
 - `tools/verify_host.sh --bare-build` 已通过裸 XIAO Sense Zephyr build；`--peripheral-build` 已通过外设启用 build。构建通过只证明固件可编译和 DTS 节点存在，不证明真实灯条/NFC 硬件通过。
 
 当前待验证：
 
-- 执行 `WRITE_ONE` 写入槽位，重启设备，再通过 `READ_ONE` 读回同一槽位。
 - APP 侧复验 `WRITE_ONE -> READ_ONE`、`READ_ALL` 结束帧和 `SET_QTY`。
-- 可破坏测试窗口内执行 `CLEAR_ONE`、`FACTORY_RESET` 的端到端验证。
-- 灯控命令实机验证：发送非 OFF 后 D3/P0.29 拉高，发送 OFF 或超时后拉低。
+- 可破坏测试窗口内执行 `CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`FACTORY_RESET` 的端到端验证，并追加重启恢复。
+- 灯控硬件实机验证：发送非 OFF 后 D3/P0.29 拉高，发送 OFF 或超时后拉低；接灯条后确认颜色和槽位。
 
 待开发：
 
 - 接真实 WS2812 灯条，并用手机灯控命令验证 Zephyr `led_strip` 驱动输出。
 - 再回到 `nrf52dk_nrf52832` 做目标芯片资源、引脚和功耗验证。
+- 接入 NT3H2111 I2C/NDEF。
 - 接入电池 ADC。
 - 完成 Android APP 侧 BLE 加密/配对重试策略验证。
+- 接入 OTA/DFU、低功耗实测方案、看门狗。
 - 增加复位原因上报。
 
 交付物：
