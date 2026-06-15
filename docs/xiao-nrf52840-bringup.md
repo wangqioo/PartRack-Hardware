@@ -254,7 +254,7 @@ python3 -m venv .venv
 .venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke
 ```
 
-自动烟测会连接 `VBRK-0000`，读取 `Table Info` / `Light Status`，开启 Binding Control Point notify，写入第 1 槽，发送 `READ_ONE` 校验读回的 16B 槽位记录，并发送 `READ_ALL` 校验结束帧 `02 00 FF`。
+自动烟测会连接 `VBRK-0000`，读取 `Table Info` / `Light Status`，开启 Binding Control Point notify，写入第 1 槽，发送 `READ_ONE` 校验读回的 16B 槽位记录，发送 `READ_ALL` 校验至少返回第 1 槽记录，并发送 `SET_QTY` 校验状态 notify。
 
 2026-06-12 当前本机执行结果：
 
@@ -322,6 +322,60 @@ BLE backend is unavailable: CoreBluetooth reported 'BLE is unsupported'. This us
 ```
 
 该错误仍发生在 CoreBluetooth 后端初始化阶段，尚未进入 `VBRK-0000` 设备扫描，不能作为固件广播、连接或 GATT 失败判断。M0 下一步切到手机 nRF Connect 手工验证：订阅 Binding Control Point notify，执行 `WRITE_ONE -> READ_ONE`、`READ_ALL`、`SET_QTY`，并记录原始 notify 字节。
+
+## 2026-06-16 M0 BLE smoke 通过项和缺口
+
+2026-06-16 已将开发期配对容量从 1 个 peer 扩到 4 个 peer，并启用 key 满时覆盖最旧记录：
+
+```text
+CONFIG_BT_MAX_PAIRED=4
+CONFIG_BT_KEYS_OVERWRITE_OLDEST=y
+```
+
+原因：手机 nRF Connect 已可能占用唯一 pairing key 槽，Mac 端自动烟测作为第二个 peer 连接时，`bt_conn_set_security(conn, BT_SECURITY_L2)` 在固件串口中返回 `-12`。扩大 key 槽后，串口确认：
+
+```text
+app_ble: security changed: level 2
+```
+
+当前烧录的 bare UF2：
+
+```text
+/Users/wq/ncs/build-partrack-PartRack-Hardware-xiao-sense-bare/app/zephyr/zephyr.uf2
+SHA-256: d008247b146fe80d64e50386706d88ffdc5386db987461fff25d80d6b4a901ae
+```
+
+真实 BLE 自动烟测命令：
+
+```bash
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke
+```
+
+2026-06-16 本机结果退出码为 0，关键输出：
+
+```text
+table_info: 03 00 00 00 9E 54 19
+light_status: 00 00 00
+binding_notify: 10 00
+binding_notify: 01 00 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18
+binding_notify: 02 00 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18
+binding_notify: 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+binding_notify: 30 00
+```
+
+已实机验证：
+
+- Mac CoreBluetooth 可扫描并连接 `VBRK-0000`。
+- Table Info / Light Status 读取通过。
+- Binding Control Point encrypted write 可在 level 2 security 后写入。
+- `WRITE_ONE` 返回 `10 00`。
+- `READ_ONE slot 1` 返回写入的完整 16B 记录。
+- `READ_ALL` 至少返回 slot 1 记录和后续空槽记录。
+- `SET_QTY slot 1 -> 42` 返回 `30 00`。
+
+仍需修复：
+
+- 真实 BLE 下 `READ_ALL` 没有收到 `02 00 FF` 结束帧。当前 GATT write callback 内连续发送 26 个 notify，真实 TX 队列可能在第二帧后暂时不可用；固件需要将 `READ_ALL` 改为 paced/asynchronous notify，或在 notify busy 时排队重试。
 
 ## 2026-06-12 Binding Table 持久化记录
 

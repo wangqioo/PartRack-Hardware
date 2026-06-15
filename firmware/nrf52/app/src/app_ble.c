@@ -273,6 +273,8 @@ BT_GATT_SERVICE_DEFINE(light_svc,
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
+    int sec_err;
+
     if (err != 0) {
         LOG_WRN("connection failed: %u", err);
         return;
@@ -282,6 +284,11 @@ static void connected(struct bt_conn *conn, uint8_t err)
     vbrk_ble_lifecycle_connected(&ble_lifecycle);
     app_status_set_ble_connected(true);
     LOG_INF("connected");
+
+    sec_err = bt_conn_set_security(conn, BT_SECURITY_L2);
+    if (sec_err != 0) {
+        LOG_WRN("failed to request encrypted link: %d", sec_err);
+    }
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -297,9 +304,23 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
     app_status_set_ble_connected(false);
 }
 
+static void security_changed(struct bt_conn *conn, bt_security_t level,
+                             enum bt_security_err err)
+{
+    ARG_UNUSED(conn);
+
+    if (err == BT_SECURITY_ERR_SUCCESS) {
+        LOG_INF("security changed: level %u", level);
+        return;
+    }
+
+    LOG_WRN("security failed: level %u err %u", level, err);
+}
+
 BT_CONN_CB_DEFINE(conn_callbacks) = {
     .connected = connected,
     .disconnected = disconnected,
+    .security_changed = security_changed,
 };
 
 static int lifecycle_notify_binding(uint8_t op, uint8_t status, const void *payload,

@@ -19,13 +19,13 @@
 | 能力 | 当前标签 | 证据来源 | 验证对象 | 缺口 / 下一步 |
 |---|---|---|---|---|
 | BLE 扫描 | Hardware verified | `docs/development-plan.md`：手机可扫描到 `VBRK-0000`，断开后恢复广播；`docs/xiao-nrf52840-bringup.md` 记录 XIAO bring-up。 | Seeed Studio XIAO nRF52840 Sense，手机 nRF Connect。 | 仍需在 nRF52832 目标板和回板硬件复验；量产设备名和 Company ID 不能按开发期占位外推。 |
-| BLE 连接 | Hardware verified | `docs/development-plan.md`：手机可连接，连接后板载蓝灯常亮。 | Seeed Studio XIAO nRF52840 Sense，手机 nRF Connect。 | 仍需验证配对/加密写入策略、断线重连稳定性和 nRF52832 目标板表现。 |
+| BLE 连接 | Hardware verified | `docs/development-plan.md`：手机可连接，连接后板载蓝灯常亮；`docs/xiao-nrf52840-bringup.md`：2026-06-16 Mac 自动烟测可连接并进入 security level 2。 | Seeed Studio XIAO nRF52840 Sense，手机 nRF Connect，Mac CoreBluetooth/Bleak。 | 仍需验证断线重连稳定性和 nRF52832 目标板表现。 |
 | GATT service discovery | Hardware verified | `docs/development-plan.md`：手机可发现 Binding Table Service 和 Light Control Service。 | Seeed Studio XIAO nRF52840 Sense，手机 nRF Connect。 | 仍需在 APP 侧和目标硬件复验。 |
 | `Table Info` 读取 | Hardware verified | `docs/development-plan.md`：实测返回 `0100 0000 2DE4 19`。 | Seeed Studio XIAO nRF52840 Sense，手机 nRF Connect。 | 仍需验证写类操作后 `table_seq`/CRC 变化和重启后保持。 |
 | `Light Status` 读取 | Hardware verified | `docs/development-plan.md`：空闲状态返回 `0000 00`。 | Seeed Studio XIAO nRF52840 Sense，手机 nRF Connect。 | 仍需验证订阅 notify、灯控命令后 remaining/mode 变化和超时行为。 |
-| Binding `WRITE_ONE -> READ_ONE` notify 闭环 | Hardware required | `tools/ble_gatt_smoke_test.py` 已有测试帧和校验逻辑；`docs/xiao-nrf52840-bringup.md` 记录 2026-06-15 `.venv` 内 `bleak` 可用，但 `--run-smoke` 仍阻塞在 macOS CoreBluetooth 后端不可用，未进入设备扫描阶段。 | 当前只有脚本/模型证据，无完整真实 BLE notify 闭环证据。 | 用手机 nRF Connect 执行：订阅 Binding Control Point notify，写入 `WRITE_ONE`，确认 `10 00` 状态 notify，再发送 `READ_ONE` 并比对同一 16B 槽位记录。 |
-| `READ_ALL` | Hardware required | `tools/ble_gatt_smoke_test.py` 已能校验 `READ_ALL` 结束帧；`docs/xiao-nrf52840-bringup.md` 记录 2026-06-15 自动烟测未进入设备扫描；`docs/firmware-quality-plan.md` 记录 dispatcher model 覆盖 end marker。 | Host/model 覆盖，尚无真实 BLE 端到端记录。 | 用手机 nRF Connect 执行 `READ_ALL`，确认返回 25 条记录和 `02 00 FF` 结束帧。 |
-| `SET_QTY` | Hardware required | `tools/binding_table_core_test.c` 覆盖 set qty；`tools/ble_gatt_smoke_test.py` 可校验状态 notify；`docs/xiao-nrf52840-bringup.md` 记录 2026-06-15 自动烟测未进入设备扫描。 | Host/model 覆盖，尚无真实 BLE 端到端记录。 | 用手机 nRF Connect 执行 `SET_QTY`，确认 `30 00` 状态 notify、Table Info notify 和 `table_seq` 变化。 |
+| Binding `WRITE_ONE -> READ_ONE` notify 闭环 | Hardware verified | `docs/xiao-nrf52840-bringup.md`：2026-06-16 `.venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke` 返回 `10 00`，并读回 `01 00 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18`。 | Seeed Studio XIAO nRF52840 Sense，bare PartRack firmware，Mac CoreBluetooth/Bleak。 | 仍需 APP 侧复验 Android 配对/重试流程；仍需 nRF52832 目标板复验。 |
+| `READ_ALL` | Hardware required | `docs/xiao-nrf52840-bringup.md`：2026-06-16 真实 BLE 自动烟测收到 slot 1 记录和后续空槽记录，但未收到 `02 00 FF` 结束帧；`docs/firmware-quality-plan.md` 记录 dispatcher model 覆盖 end marker。 | XIAO 真实 BLE 部分通过；host/model 覆盖完整逻辑。 | 固件需要将 `READ_ALL` 改为 paced/asynchronous notify，或在 notify busy 时排队重试；修复后确认返回 25 条记录和 `02 00 FF`。 |
+| `SET_QTY` | Hardware verified | `docs/xiao-nrf52840-bringup.md`：2026-06-16 自动烟测在 slot 1 有记录后执行 `SET_QTY 30 01 2A 00`，收到 `30 00`。 | Seeed Studio XIAO nRF52840 Sense，bare PartRack firmware，Mac CoreBluetooth/Bleak。 | 仍需补 `READ_ONE` 再读数量为 `0x002A` 的端到端证据，以及 APP/nRF52832 复验。 |
 | settings/NVS 重启恢复 | Hardware required | `tools/storage_snapshot_test.c` 覆盖 snapshot magic/version/CRC/损坏拒绝；`docs/development-plan.md` 记录固件已实现并烧录到 XIAO，但仍需“写入 -> 重启 -> 读回”手机实机确认。 | Host verified；XIAO 固件已具备实现但未完成闭环证据。 | 手机写入槽位，重启设备，再连接并 `READ_ONE` 读回；记录日期、固件版本和原始结果。 |
 | 灯条电源门控 | Hardware required | `tools/light_policy_test.c`、`tools/light_state_test.c` 覆盖策略和超时；`docs/development-plan.md` 记录 D3/P0.29 初版实现。 | Host verified；开发板引脚实现存在。 | 烧录灯控固件，测 D3/P0.29：非 OFF 拉高，OFF/超时拉低；回板后复验目标 P-MOS。 |
 | WS2812 真实灯条 | Hardware required | `tools/light_frame_test.c` 覆盖 25 槽 RGB frame；Zephyr build 已确认编入 `ws2812_spi.c`、`spi_nrfx_spim.c`、`nrfx_spim.c`；XIAO devicetree 已绑定 `worldsemi,ws2812-spi`。 | Host verified + Zephyr build verified；尚未接真实 25 颗 WS2812 灯条。 | 接真实灯条，验证 1-25 槽位、颜色、B 覆盖 A、多槽 PICK、OFF 和超时熄灯。 |
@@ -48,7 +48,7 @@
 
 | Gate | 验收口径 | 当前状态 |
 |---|---|---|
-| M0 | 无 NFC 前提下完成扫描、连接、Table Info、绑定表读写、灯控状态。 | 部分通过：扫描、连接、service discovery、Table Info、Light Status 已在 XIAO 实机通过；`WRITE_ONE -> READ_ONE` notify、`READ_ALL`、`SET_QTY`、灯条电源门控实机闭环仍缺。 |
+| M0 | 无 NFC 前提下完成扫描、连接、Table Info、绑定表读写、灯控状态。 | 部分通过：扫描、连接、service discovery、Table Info、Light Status、encrypted `WRITE_ONE -> READ_ONE` 和 `SET_QTY` 已在 XIAO 实机通过；`READ_ALL` 结束帧、灯控状态变化、灯条电源门控实机闭环仍缺。 |
 | M1 | NFC 触发 APP 定向连接并下发 FIND。 | 未通过：NFC FD、NT3H2111 I2C/NDEF 和 APP URI 路由仍需实机验证。 |
 | M2 | 重启后从硬件恢复 25 槽绑定表。 | 未通过：settings/NVS host 证据存在，但“写入 -> 重启 -> 读回”真实设备闭环未完成。 |
 | v1 | 硬件、APP 契约、固件质量和回板验证完成，OTA DFU release gate 达成。 | 未通过：回板验证、nRF52832 资源/引脚/功耗、真实 WS2812、NFC、电池 ADC、低功耗和 OTA/DFU 仍缺证据。 |

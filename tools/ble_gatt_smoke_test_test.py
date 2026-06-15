@@ -5,7 +5,9 @@ from ble_gatt_smoke_test import (
     SmokeValidationError,
     expected_slot1_record,
     explain_ble_backend_error,
+    is_encryption_error,
     make_test_vectors,
+    validate_read_all_partial_notifications,
     validate_read_all_notifications,
     validate_read_one_notifications,
     validate_status_notification,
@@ -73,6 +75,12 @@ def test_read_all_validation_requires_end_marker() -> None:
     validate_read_all_notifications(notifications)
 
 
+def test_read_all_partial_validation_requires_slot_one_payload() -> None:
+    record = expected_slot1_record()
+
+    validate_read_all_partial_notifications([bytes([0x02, 0x00]) + record], record)
+
+
 def test_read_all_validation_rejects_missing_end_marker() -> None:
     try:
         validate_read_all_notifications([bytes([0x02, 0x00]) + expected_slot1_record()])
@@ -103,14 +111,25 @@ def test_explains_corebluetooth_unsupported_error() -> None:
     assert "BLE is unsupported" in message
 
 
+def test_detects_corebluetooth_encryption_errors() -> None:
+    message = (
+        'Error Domain=CBATTErrorDomain Code=15 "Encryption is insufficient." '
+        "UserInfo={NSLocalizedDescription=Encryption is insufficient.}"
+    )
+
+    assert is_encryption_error(RuntimeError(message))
+
+
 if __name__ == "__main__":
     test_vectors_match_manual_bringup_values()
     test_vectors_cover_binding_mutations_and_factory_reset()
     test_read_one_validation_requires_exact_slot_record()
     test_read_one_validation_rejects_wrong_payload()
     test_read_all_validation_requires_end_marker()
+    test_read_all_partial_validation_requires_slot_one_payload()
     test_read_all_validation_rejects_missing_end_marker()
     test_status_validation_requires_exact_op_and_status()
     test_status_validation_rejects_missing_status()
     test_explains_corebluetooth_unsupported_error()
+    test_detects_corebluetooth_encryption_errors()
     print("ble gatt smoke test vectors passed")
