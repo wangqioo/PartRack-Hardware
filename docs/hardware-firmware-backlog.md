@@ -1,5 +1,7 @@
 # 硬件与固件任务清单
 
+详细实机验证顺序、通过标准和证据记录格式见 [pending-verification-plan.md](pending-verification-plan.md)。本清单保留功能范围，验证事实状态以 [verification-matrix.md](verification-matrix.md) 为准。
+
 ## P0 协议冻结
 
 - 生成随机 128-bit 自定义基 UUID。

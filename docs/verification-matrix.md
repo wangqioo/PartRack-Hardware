@@ -2,6 +2,8 @@
 
 本文档是 PartRack-Hardware 的验证事实单一来源。证据状态只在这里更新；开发计划、集成控制台、质量计划和回板清单只应摘要或链接到本台账，不应另行声明“已验证”。
 
+详细待验证清单、推荐验证顺序和每项通过标准见 [pending-verification-plan.md](pending-verification-plan.md)。本台账只记录证据状态和结论。
+
 ## 证据标签
 
 | 标签 | 证明什么 | 不证明什么 |

@@ -123,6 +123,74 @@ UF2 是最简单的开发期烧录方式：
 west flash
 ```
 
+## XIAO BLE 恢复基线
+
+2026-06-15 恢复结论：如果 XIAO nRF52840 Sense 出现“Zephyr/PartRack/官方 BLE app 都扫不到、但裸机 blink 能跑”的状态，优先怀疑 bootloader/SoftDevice 启动链，不要继续盲烧业务固件。
+
+已验证可恢复基线：
+
+- bootloader: Seeed 官方 `UF2 Bootloader 0.6.1`
+- Board-ID: `Seeed_XIAO_nRF52840_Sense`
+- SoftDevice: `S140 version 7.3.0`
+- XIAO serial: `12EBF0B1B70E5B58`
+- bootloader USB VID/PID: `2886:0045`
+- app USB VID/PID: `2886:8045`
+- 正确 XIAO 串口：`/dev/cu.usbmodem11301`
+
+不要把 `/dev/cu.usbmodem0010000001` 当作 XIAO。该端口在本机是 CanMV，VID/PID 为 `1209:ABD1`，序列号为 `001000000`。
+
+已确认的失败路线：
+
+- `update-..._nosd.uf2` 只更新 bootloader，不重写完整 SoftDevice。
+- 将 Seeed 完整 `.hex` 转为 UF2 再拖入 `XIAO-SENSE`，会触发设备断开，但不能保证完整写入。
+- 块级校验显示，SoftDevice-only UF2 只匹配前 176 个 block；`0xc000..0x26500` 仍不匹配。
+- macOS 对 UF2 盘复制时报 `Device not configured` 或 `Input/output error` 不能单独作为成功或失败判断，必须结合 `INFO_UF2.TXT` 和 `CURRENT.UF2` 校验。
+
+已验证的正确恢复命令：
+
+```bash
+/Users/wq/Library/Arduino15/packages/Seeeduino/hardware/nrf52/1.1.12/tools/adafruit-nrfutil/macos/adafruit-nrfutil \
+  --verbose dfu serial \
+  -pkg /Users/wq/Library/Arduino15/packages/Seeeduino/hardware/nrf52/1.1.12/bootloader/Seeed_XIAO_nRF52840_Sense/Seeed_XIAO_nRF52840_Sense_bootloader-0.6.2_s140_7.3.0.zip \
+  -p /dev/cu.usbmodem11301 \
+  -b 115200 \
+  --singlebank
+```
+
+成功输出应包含：
+
+```text
+Starting DFU upgrade of type 3, SoftDevice size: 152728, bootloader size: 39000, application size: 0
+Activating new firmware
+Device programmed.
+```
+
+恢复后双击 reset，`/Volumes/XIAO-SENSE/INFO_UF2.TXT` 应显示：
+
+```text
+UF2 Bootloader 0.6.1 ...
+Board-ID: Seeed_XIAO_nRF52840_Sense
+SoftDevice: S140 version 7.3.0
+Date: Nov 12 2021
+```
+
+官方 BLE 基线复测使用 Seeed Arduino core：
+
+```bash
+PATH=/private/tmp/pyshim:$PATH arduino-cli upload \
+  -p /dev/cu.usbmodem11301 \
+  --fqbn Seeeduino:nrf52:xiaonRF52840Sense \
+  --input-dir /private/tmp/seeed-xiao-official-bleuart-build
+```
+
+成功输出：
+
+```text
+Device programmed.
+```
+
+手机 nRF Connect 已确认可扫描到官方 Bluefruit BLEUART app，设备名为 `XIAO nRF52840 Sense`。
+
 ## 当前本机状态
 
 当前本机 NCS workspace：

@@ -10,6 +10,8 @@
 - 高配实验/余量验证：nRF52840。
 - 固件工具链：优先 nRF Connect SDK / Zephyr。
 - XIAO nRF52840 资料、引脚和烧录路径沉淀在 [xiao-nrf52840-bringup.md](xiao-nrf52840-bringup.md)。
+- 当前 XIAO 恢复基线：Seeed 官方 bootloader `0.6.1` + SoftDevice `S140 7.3.0`；救援时使用 Seeed 官方 `softdevice_bootloader` 串口 DFU 包，不使用 `0.11.0_nosd.uf2` 作为恢复方案。
+- 已开发但待实机补证的功能集中记录在 [pending-verification-plan.md](pending-verification-plan.md)，验证事实状态以 [verification-matrix.md](verification-matrix.md) 为准。
 - 本仓库不开发 APP 页面、Room 数据库、BOM 匹配、扫码入库、二维码打印和库存导入导出。
 
 ## 当前进度快照
@@ -19,6 +21,7 @@
 - 仓库已同步到 GitHub：`wangqioo/PartRack-Hardware`。
 - nRF Connect SDK / Zephyr 本机工具链已可构建 XIAO nRF52840 Sense 固件。
 - 已通过 UF2 烧录到 Seeed Studio XIAO nRF52840 Sense。
+- 2026-06-15 已将 XIAO 启动链恢复到 Seeed 官方 `UF2 Bootloader 0.6.1` + `S140 7.3.0`，并用官方 Bluefruit BLEUART app 验证手机可扫描到 `XIAO nRF52840 Sense`。
 - 官方 Zephyr `peripheral_hr` 样例已在同一开发板上验证，手机可扫描到 `Zephyr Heartrate Sensor`。
 - PartRack 固件已实现并实机验证 BLE 广播、连接、GATT service discovery、`Table Info` 读取和 `Light Status` 读取。
 - 已修复两个 bring-up 问题：
