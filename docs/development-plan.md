@@ -33,7 +33,7 @@
   - 绿灯慢闪：固件 ready，正在广播，未连接。
   - 蓝灯常亮：BLE 已连接。
 - 已新增电脑侧 BLE/GATT 烟测辅助脚本：`tools/ble_gatt_smoke_test.py`。
-- BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录、paced `READ_ALL` 结束帧、`SET_QTY` 状态 notify，并可选执行 `CLEAR_ONE` / `FACTORY_RESET`；2026-06-16 已在 Mac CoreBluetooth/Bleak + XIAO 实机上跑通非破坏性 smoke。
+- BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录、paced `READ_ALL` 结束帧、`SET_QTY` 后读回、Table Info seq/CRC、Light Status 状态变化和单槽重启恢复，并可选执行 `CLEAR_ONE` / `FACTORY_RESET`；2026-06-16 已在 Mac CoreBluetooth/Bleak + XIAO 实机上跑通非破坏性批量验证。
 - 已新增本机一键验证脚本：`tools/verify_host.sh`。
 - 已新增验证证据台账：[verification-matrix.md](verification-matrix.md)，后续 host/model/build/hardware 证据状态以该台账为准。
 - 已实现 BLE lifecycle host model：
@@ -65,14 +65,14 @@
 
 当前仍未完成：
 
-- Binding Table 持久化固件已烧录到 XIAO nRF52840 Sense，仍需做“写入 -> 重启 -> 读回”的手机实机确认。
+- Binding Table 单槽持久化已在 XIAO nRF52840 Sense 完成“写入 -> 单击 reset -> 读回”确认；多槽、移动/删除/清空类操作后的重启恢复仍需补证。
 - 灯控已有 GATT 接口、状态框架、电源门控、25 槽 RGB 帧生成和 XIAO 上的 Zephyr WS2812 SPI 输出绑定，仍需接真实 25 颗 WS2812 灯条实测。
-- BLE lifecycle 已 host/build verified，encrypted Binding CP、`WRITE_ONE -> READ_ONE`、paced `READ_ALL` 和 `SET_QTY` 已在 XIAO 实机通过；断开重连长稳、APP 侧配对重试和目标 nRF52832 radio 行为仍需复验。
+- BLE lifecycle 已 host/build verified，encrypted Binding CP、`WRITE_ONE -> READ_ONE`、paced `READ_ALL`、`SET_QTY` 读回和 Light Command 状态闭环已在 XIAO 实机通过；断开重连长稳、APP 侧配对重试和目标 nRF52832 radio 行为仍需复验。
 - NFC / NT3H2111、电池 ADC、低功耗和 OTA 仍未接入。
 
 下一步优先级：
 
-1. 使用手机 nRF Connect 手工验证 Binding Table 持久化：写入槽位、重启、再次连接读回。
+1. 做破坏性绑定表窗口：`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`FACTORY_RESET`，并追加重启恢复验证。
 2. 烧录灯条电源门控固件，验证 D3/P0.29 会随灯控命令拉高/拉低。
 3. 用 APP 侧复验配对/加密重试、`READ_ALL` 结束帧处理和断开重连。
 4. 接真实 25 颗 WS2812 灯条，验证 `FIND/PICK/SORT/STOCK_IN/OFF` 的颜色、槽位和超时熄灯。

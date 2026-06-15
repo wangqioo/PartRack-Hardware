@@ -27,5 +27,7 @@
 
 - [ ] `python3 tools/ble_gatt_smoke_test.py --print-vectors` 可输出测试帧。
 - [x] 2026-06-16 Mac CoreBluetooth/Bleak + XIAO 实机运行真实 `--run-smoke` 通过，覆盖 `WRITE_ONE -> READ_ONE`、`READ_ALL` 结束帧和 `SET_QTY`。
+- [x] 2026-06-16 `--run-batch` 通过，覆盖 `SET_QTY` 后读回、Table Info seq/CRC 和 Light Status FIND/OFF。
+- [x] 2026-06-16 单击 reset 后 `--run-persistence-read` 通过，slot 1 读回 `C1234567 / qty=42`。
 - [ ] 后续在 Android APP 侧复验同一流程。
 - [ ] macOS CoreBluetooth 后端不可用时，不能把脚本单测当成真实 BLE 通过。

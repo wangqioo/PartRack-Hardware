@@ -7,10 +7,15 @@ from ble_gatt_smoke_test import (
     explain_ble_backend_error,
     is_encryption_error,
     make_test_vectors,
+    validate_light_status,
     validate_read_all_partial_notifications,
     validate_read_all_notifications,
     validate_read_one_notifications,
+    validate_table_crc_changed,
     validate_status_notification,
+    validate_table_info,
+    validate_table_info_changed,
+    validate_table_seq_increased,
 )
 
 
@@ -51,6 +56,12 @@ def test_read_one_validation_requires_exact_slot_record() -> None:
     ]
 
     validate_read_one_notifications(notifications, record)
+
+
+def test_read_one_validation_accepts_updated_quantity() -> None:
+    record = expected_slot1_record(qty=42)
+
+    validate_read_one_notifications([bytes([0x01, 0x00]) + record], record)
 
 
 def test_read_one_validation_rejects_wrong_payload() -> None:
@@ -94,6 +105,71 @@ def test_status_validation_requires_exact_op_and_status() -> None:
     validate_status_notification([bytes.fromhex("10 00"), bytes.fromhex("30 00")], 0x30)
 
 
+def test_table_info_validation_requires_shape_and_slot_count() -> None:
+    validate_table_info(bytes.fromhex("05 00 00 00 21 F5 19"))
+
+    try:
+        validate_table_info(bytes.fromhex("05 00 00 00 21 F5 18"))
+    except SmokeValidationError as exc:
+        assert "slot_count" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
+def test_table_info_changed_requires_seq_or_crc_change() -> None:
+    before = bytes.fromhex("05 00 00 00 21 F5 19")
+    after = bytes.fromhex("06 00 00 00 10 44 19")
+
+    validate_table_info_changed(before, after)
+
+    try:
+        validate_table_info_changed(before, before)
+    except SmokeValidationError as exc:
+        assert "Table Info did not change" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
+def test_table_seq_validation_requires_increase() -> None:
+    before = bytes.fromhex("05 00 00 00 21 F5 19")
+    after = bytes.fromhex("06 00 00 00 21 F5 19")
+
+    validate_table_seq_increased(before, after)
+
+    try:
+        validate_table_seq_increased(after, before)
+    except SmokeValidationError as exc:
+        assert "seq did not increase" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
+def test_table_crc_validation_requires_change() -> None:
+    before = bytes.fromhex("05 00 00 00 21 F5 19")
+    after = bytes.fromhex("06 00 00 00 10 44 19")
+
+    validate_table_crc_changed(before, after)
+
+    try:
+        validate_table_crc_changed(before, bytes.fromhex("06 00 00 00 21 F5 19"))
+    except SmokeValidationError as exc:
+        assert "CRC did not change" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
+def test_light_status_validation_checks_mode_and_remaining() -> None:
+    validate_light_status(bytes.fromhex("00 00 00"), expected_mode=0)
+    validate_light_status(bytes.fromhex("01 09 00"), expected_mode=1, min_remaining=1)
+
+    try:
+        validate_light_status(bytes.fromhex("01 00 00"), expected_mode=1, min_remaining=1)
+    except SmokeValidationError as exc:
+        assert "remaining" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
 def test_status_validation_rejects_missing_status() -> None:
     try:
         validate_status_notification([bytes.fromhex("10 00")], 0x30)
@@ -124,11 +200,17 @@ if __name__ == "__main__":
     test_vectors_match_manual_bringup_values()
     test_vectors_cover_binding_mutations_and_factory_reset()
     test_read_one_validation_requires_exact_slot_record()
+    test_read_one_validation_accepts_updated_quantity()
     test_read_one_validation_rejects_wrong_payload()
     test_read_all_validation_requires_end_marker()
     test_read_all_partial_validation_requires_slot_one_payload()
     test_read_all_validation_rejects_missing_end_marker()
     test_status_validation_requires_exact_op_and_status()
+    test_table_info_validation_requires_shape_and_slot_count()
+    test_table_info_changed_requires_seq_or_crc_change()
+    test_table_seq_validation_requires_increase()
+    test_table_crc_validation_requires_change()
+    test_light_status_validation_checks_mode_and_remaining()
     test_status_validation_rejects_missing_status()
     test_explains_corebluetooth_unsupported_error()
     test_detects_corebluetooth_encryption_errors()

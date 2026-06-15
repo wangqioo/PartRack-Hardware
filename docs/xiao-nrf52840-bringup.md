@@ -413,6 +413,51 @@ binding_notify: 30 00
 - `tools/ble_gatt_smoke_test.py --run-smoke` 已恢复对 `READ_ALL` 结束帧的硬性校验；缺少 `02 00 FF` 会失败，不再只打印警告。
 - 当前结论只覆盖 Seeed Studio XIAO nRF52840 Sense + bare PartRack firmware + Mac CoreBluetooth/Bleak；仍需 Android APP 和 nRF52832 目标板复验。
 
+同日新增批量验证模式：
+
+```bash
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-batch
+```
+
+该模式在单次 BLE 连接内依次验证 Table Info、Light Status、`WRITE_ONE -> READ_ONE`、`READ_ALL` 结束帧、`SET_QTY` 后再 `READ_ONE`、Table Info seq/CRC、Light Command FIND 和 Light OFF。
+
+2026-06-16 批量验证关键输出：
+
+```text
+table_info_before: 09 00 00 00 21 F5 19
+light_status_initial: 00 00 00
+binding_notify: 10 00
+table_info_after_write: 0A 00 00 00 9E 54 19
+binding_notify: 01 00 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18
+binding_notify: 02 00 FF
+binding_notify: 30 00
+binding_notify: 01 00 01 43 31 32 33 34 35 36 37 00 00 2A 00 00 00 61
+table_info_after: 0B 00 00 00 21 F5 19
+light_status_find: 01 0A 00
+light_status_off: 00 00 00
+```
+
+Table Info 解释：`seq 09 -> 0A -> 0B` 表示两次写类操作均递增版本；CRC `21F5 -> 549E -> 21F5` 是合理结果，因为批量脚本先把 slot 1 写回 qty=12，再 set 回 qty=42，最终表内容回到了起始状态。
+
+单击 reset 重启后，执行：
+
+```bash
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-persistence-read
+```
+
+2026-06-16 持久化读回关键输出：
+
+```text
+table_info_after_reboot: 0B 00 00 00 21 F5 19
+binding_notify: 01 00 01 43 31 32 33 34 35 36 37 00 00 2A 00 00 00 61
+```
+
+新增实机结论：
+
+- `SET_QTY slot 1 -> 42` 后追加 `READ_ONE`，可读回 qty `0x002A`。
+- settings/NVS 真实重启恢复通过：单击 reset 后，slot 1 仍读回 `C1234567 / qty=42`，Table Info seq/CRC 未回退。
+- Light Command 无外接灯条状态闭环通过：`FIND` 后 `Light Status` 返回 mode `01` 和剩余 10s，发送 OFF 后返回 `00 00 00`。
+
 ### BLE 加密配对经验总结
 
 这次 Mac 弹出连接/配对提醒，不是 macOS 自己变好了，而是固件和配对容量同时满足了 CoreBluetooth 的触发条件。

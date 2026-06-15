@@ -8,8 +8,8 @@
 - 固件工具链：nRF Connect SDK / Zephyr。
 - 当前设备名：`VBRK-0000`。
 - 当前已实机验证：手机可扫描、连接、发现 GATT 服务、读取 `Table Info` 和 `Light Status`。
-- 当前已脚本化并在 XIAO 实机通过：Mac CoreBluetooth/Bleak 自动 smoke 可完成 encrypted `WRITE_ONE -> READ_ONE` notify 闭环、paced `READ_ALL` 结束帧和 `SET_QTY` 状态 notify。
-- 当前固件已接入 settings/NVS 持久化和 XIAO WS2812 SPI 输出绑定；仍需实机做“写入 -> 重启 -> 读回”和真实灯条点亮确认。
+- 当前已脚本化并在 XIAO 实机通过：Mac CoreBluetooth/Bleak 自动 smoke 可完成 encrypted `WRITE_ONE -> READ_ONE` notify 闭环、paced `READ_ALL` 结束帧、`SET_QTY` 后读回、Light Status 状态变化和单槽重启恢复。
+- 当前固件已接入 settings/NVS 持久化和 XIAO WS2812 SPI 输出绑定；单槽“写入 -> 重启 -> 读回”已通过，真实灯条点亮仍待确认。
 
 ## 当前 APP 可并行开发任务
 
@@ -447,6 +447,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 .venv/bin/python tools/ble_gatt_smoke_test.py --print-vectors
 .venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-batch
 ```
 
 `--run-smoke` 会自动执行：
@@ -460,6 +461,20 @@ python3 -m venv .venv
 - 发送 `READ_ALL` 并校验结束帧 `02 00 FF`。
 - 发送 `SET_QTY` 并校验写操作状态 notify。
 
+`--run-batch` 在 `--run-smoke` 基础上额外校验：
+
+- `SET_QTY` 后再次 `READ_ONE`，确认数量变成 `0x002A`。
+- 写类操作后 Table Info seq 增长，CRC 随内容变化。
+- Light Command FIND 后 `Light Status` 进入 mode 1，发送 OFF 后回到 `00 00 00`。
+
+单击 reset 后可执行：
+
+```bash
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-persistence-read
+```
+
+该命令会确认重启后 slot 1 仍可读回 `C1234567 / qty=42`。
+
 若要同时验证清空和恢复出厂，可追加：
 
 ```bash
@@ -468,13 +483,13 @@ python3 tools/ble_gatt_smoke_test.py --run-smoke --include-destructive
 
 如果输出 `CoreBluetooth reported 'BLE is unsupported'`，说明当前电脑运行环境不能访问 macOS 蓝牙后端，尚未进入设备扫描阶段，不代表 nRF 设备失败。
 
-2026-06-16 当前 Mac 环境已跑通非破坏性 `--run-smoke`；如果后续再次出现 CoreBluetooth 后端错误，应先排查本机蓝牙权限或运行环境，而不是直接判断固件失败。
+2026-06-16 当前 Mac 环境已跑通非破坏性 `--run-smoke`、`--run-batch` 和单击 reset 后的 `--run-persistence-read`；如果后续再次出现 CoreBluetooth 后端错误，应先排查本机蓝牙权限或运行环境，而不是直接判断固件失败。
 
 ## 当前限制和后续变化
 
 当前限制：
 
-- 绑定表已接入 settings/NVS 持久化，但仍需做手机实机“写入 -> 重启 -> 读回”确认。
+- 绑定表已接入 settings/NVS 持久化，XIAO 单槽“写入 -> 重启 -> 读回”已通过；多槽和破坏性操作后的恢复仍需补证。
 - WS2812 已接入 XIAO devicetree/SPI 驱动，真实灯条仍需接线确认颜色、槽位和供电。
 - 设备名仍固定为 `VBRK-0000`。后续会改为按设备唯一信息生成 `VBRK-XXXX`。
 - NFC URI 尚未接入。后续目标格式为 `lcscerp://device?mac=...&batch=...&ver=1`。
