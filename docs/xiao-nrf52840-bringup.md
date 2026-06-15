@@ -223,6 +223,38 @@ tools/verify_host.sh --peripheral-build
 
 这些结果是 host/build 证据，不替代真实 BLE notify、真实 WS2812 灯条、真实 NFC 或功耗实测。
 
+## 2026-06-15 M0 BLE smoke 尝试记录
+
+本机已用项目虚拟环境确认 BLE smoke 依赖存在：
+
+```bash
+.venv/bin/python -m pip show bleak
+```
+
+结果：`bleak 0.22.3` 已安装在项目 `.venv`。
+
+测试帧生成通过：
+
+```bash
+.venv/bin/python tools/ble_gatt_smoke_test.py --print-vectors
+```
+
+输出包含 `WRITE_ONE`、`READ_ONE`、`READ_ALL`、`SET_QTY`、`FACTORY_RESET` 和灯控测试帧。
+
+真实 BLE 自动烟测命令：
+
+```bash
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke
+```
+
+当前本机结果：
+
+```text
+BLE backend is unavailable: CoreBluetooth reported 'BLE is unsupported'. This usually means the current terminal/runtime is restricted from using the macOS Bluetooth stack, not that the nRF device failed. Original error: BLE is unsupported
+```
+
+该错误仍发生在 CoreBluetooth 后端初始化阶段，尚未进入 `VBRK-0000` 设备扫描，不能作为固件广播、连接或 GATT 失败判断。M0 下一步切到手机 nRF Connect 手工验证：订阅 Binding Control Point notify，执行 `WRITE_ONE -> READ_ONE`、`READ_ALL`、`SET_QTY`，并记录原始 notify 字节。
+
 ## 2026-06-12 Binding Table 持久化记录
 
 已完成固件侧 settings/NVS 持久化初版：
