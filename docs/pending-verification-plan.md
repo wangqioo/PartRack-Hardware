@@ -8,6 +8,7 @@
 - 当前启动链：Seeed 官方 `UF2 Bootloader 0.6.1` + `S140 7.3.0`。
 - 当前 PartRack 裸 XIAO BLE 固件：`/Users/wq/ncs/build-partrack-PartRack-Hardware-xiao-sense-bare/app/zephyr/zephyr.uf2`。
 - 2026-06-16 烧录后状态：设备可被手机和 Mac BLE smoke 脚本连接，设备名 `VBRK-0000`。
+- 2026-06-16 READ_ALL paced/asynchronous notify 修复后 UF2 SHA-256：`53f357028fe87e618ade4e3dd77cf18296b8bdaeef463481108a4e8a2e291541`。
 - 当前裸 XIAO variant 不加载外接 WS2812、灯条电源门控和 NFC FD；相关 warning 属于预期。
 
 ## 已开发并待实机验证
@@ -17,9 +18,9 @@
 | BLE 扫描和连接回归 | 设备名 `VBRK-0000`、connectable advertising、断开后重启广播。 | 2026-06-15 恢复后手机已能连接；历史记录有扫描、连接和断开后恢复广播。 | 手机 nRF Connect 扫描、连接、断开、再次扫描并连接。 | 每次断开后 10 秒内能重新扫到 `VBRK-0000`，再次连接成功。 |
 | GATT service discovery | Binding Table Service 和 Light Control Service 已实现。 | 历史手机 nRF Connect 已发现两个 service。 | 连接后执行 service discovery。 | 能看到 `7f4b0001-...` 和 `7f4b0002-...` 两个 service。 |
 | Table Info 读取 | `table_seq + crc16 + slot_count` 特征已实现。 | 历史返回 `0100 0000 2DE4 19`。 | 读取 `7f4b1002-8d1a-4d45-9a4e-2b4a7c000000`。 | 返回 7B；写入绑定表后 `table_seq` 或 CRC 有变化。 |
-| Binding Control Point notify | 绑定表命令响应通过 notify 返回。 | 2026-06-16 Mac 自动烟测已收到 `10 00`、`READ_ONE` payload、`READ_ALL` 部分 payload 和 `30 00`。 | APP 侧开启 `7f4b1001-8d1a-4d45-9a4e-2b4a7c000000` notify 后复验。 | 写命令后能收到对应状态或数据 notify。 |
+| Binding Control Point notify | 绑定表命令响应通过 notify 返回。 | 2026-06-16 Mac 自动烟测已收到 `10 00`、`READ_ONE` payload、完整 `READ_ALL` payload/end marker 和 `30 00`。 | APP 侧开启 `7f4b1001-8d1a-4d45-9a4e-2b4a7c000000` notify 后复验。 | 写命令后能收到对应状态或数据 notify。 |
 | `WRITE_ONE -> READ_ONE` | `WRITE_ONE`、`READ_ONE`、槽位记录编码和解码已实现。 | 2026-06-16 Mac 自动烟测已通过：`10 00` 后读回完整 slot 1 记录。 | APP/nRF52832 复验；必要时重复 Mac smoke。 | 先收到成功状态，再收到 `01 00 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18`。 |
-| `READ_ALL` | 全表读取和结束帧已实现于 host/model。 | 2026-06-16 真实 BLE 只收到 slot 1 和后续空槽记录，未收到 `02 00 FF`。 | 修复固件 paced/asynchronous notify 后，写 `02` 到 Binding Control Point。 | 收到逐槽记录，最后收到 `02 00 FF`。 |
+| `READ_ALL` | 全表读取已改为 paced/asynchronous notify，并在 notify busy 时重试同一槽。 | 2026-06-16 Mac 自动烟测已通过：收到 slot 1、后续空槽记录和 `02 00 FF`。 | APP 侧复验超时/结束帧处理；nRF52832 目标板复验。 | APP 能同步 25 槽记录并以 `02 00 FF` 判断完成。 |
 | `SET_QTY` | 单槽数量修改已实现。 | 2026-06-16 Mac 自动烟测已收到 `30 00`。 | 补 `SET_QTY` 后 `READ_ONE` 再读，确认数量为 `0x002A`；APP/nRF52832 复验。 | 收到 `30 00` 状态 notify；再次 `READ_ONE` 时数量为 `0x002A`；Table Info 变化。 |
 | `CLEAR_ONE` | 单槽清空已实现。 | host/model 和 smoke vectors 已覆盖。 | 破坏性测试窗口内写 `11 01`，再 `READ_ONE slot 1`。 | slot 1 返回空记录，Table Info 变化。 |
 | `INSERT_AT` | 插入并移动槽位已实现。 | host/model 已覆盖基础操作。 | 准备两条记录后执行 `INSERT_AT`，再 `READ_ALL`。 | 插入位置及后续槽位顺序符合协议。 |
@@ -39,7 +40,7 @@
 
 | 工具 / 模型 | 已完成内容 | 当前限制 | 后续验证 |
 |---|---|---|---|
-| `tools/ble_gatt_smoke_test.py` | 生成测试帧，并可自动连接、订阅 notify、执行 encrypted `WRITE_ONE -> READ_ONE`、`READ_ALL` 部分校验、`SET_QTY`。 | 2026-06-16 已可在当前 Mac 跑通非破坏性 smoke；`READ_ALL` end marker 缺失被显式记录为固件待修复。 | 修复 paced `READ_ALL` 后恢复对 `02 00 FF` 的硬性校验。 |
+| `tools/ble_gatt_smoke_test.py` | 生成测试帧，并可自动连接、订阅 notify、执行 encrypted `WRITE_ONE -> READ_ONE`、`READ_ALL` 完整结束帧校验、`SET_QTY`。 | 2026-06-16 已可在当前 Mac 跑通非破坏性 smoke；缺少 `02 00 FF` 会失败。 | 后续用它做 APP 对照、nRF52832 目标板复验和破坏性命令窗口验证。 |
 | BLE lifecycle host model | 覆盖断开后恢复广播、connected 状态延迟刷新、notify 失败不回滚 domain 操作。 | 不证明真实 radio、手机栈、实际 notify 顺序。 | 手机实测断开重连、写入后广播数据刷新和 notify 顺序。 |
 | Binding Table host/model tests | 覆盖槽位操作、记录编码、CRC snapshot。 | 不证明 Zephyr settings/NVS 与 flash 实际写入成功。 | 做“写入 -> 重启 -> 读回”真实设备闭环。 |
 | Light policy/frame/state tests | 覆盖超时、模式、25 槽 RGB frame 和状态切换。 | 不证明 GPIO、电源门控和真实 WS2812 时序。 | 接真实硬件测 GPIO 和灯条。 |
@@ -60,11 +61,11 @@
 
 1. BLE 回归：扫描、连接、service discovery、Table Info、Light Status。
 2. Binding CP notify：开启 notify，执行 `WRITE_ONE -> READ_ONE`。
-3. 修复全表同步：将 `READ_ALL` 改为 paced/asynchronous notify，复验结束帧 `02 00 FF`。
-4. 数量修改补证：执行 `SET_QTY` 后追加 `READ_ONE`，确认数量和 Table Info 变化。
-5. 持久化：写入 slot 1，重启设备，再 `READ_ONE slot 1`。
-6. 断开重连：断开后再次扫描连接，确认广播恢复。
-7. 破坏性绑定表测试：`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`FACTORY_RESET`。
+3. 数量修改补证：执行 `SET_QTY` 后追加 `READ_ONE`，确认数量和 Table Info 变化。
+4. 持久化：写入 slot 1，重启设备，再 `READ_ONE slot 1`。
+5. 断开重连：断开后再次扫描连接，确认广播恢复。
+6. 破坏性绑定表测试：`CLEAR_ONE`、`INSERT_AT`、`REMOVE_AT`、`MOVE_BLOCK`、`FACTORY_RESET`。
+7. APP 侧 `READ_ALL` 复验：确认 APP 能等待 25 槽和 `02 00 FF`，并处理超时重试。
 8. 灯控无灯条验证：发送 Light Command，读取 Light Status，确认超时回 OFF。
 9. 外设 build 验证：烧 peripheral build，测 D3/P0.29 电源门控。
 10. 真实 WS2812：接 25 颗灯条，验证颜色、槽位、B 覆盖 A、超时熄灯。

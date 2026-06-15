@@ -8,7 +8,7 @@
 - 固件工具链：nRF Connect SDK / Zephyr。
 - 当前设备名：`VBRK-0000`。
 - 当前已实机验证：手机可扫描、连接、发现 GATT 服务、读取 `Table Info` 和 `Light Status`。
-- 当前已脚本化但待真实 BLE 后端复测：`WRITE_ONE -> READ_ONE` 的 notify 闭环、`READ_ALL` 结束帧、`SET_QTY`、可选 `CLEAR_ONE`/`FACTORY_RESET`。
+- 当前已脚本化并在 XIAO 实机通过：Mac CoreBluetooth/Bleak 自动 smoke 可完成 encrypted `WRITE_ONE -> READ_ONE` notify 闭环、paced `READ_ALL` 结束帧和 `SET_QTY` 状态 notify。
 - 当前固件已接入 settings/NVS 持久化和 XIAO WS2812 SPI 输出绑定；仍需实机做“写入 -> 重启 -> 读回”和真实灯条点亮确认。
 
 ## 当前 APP 可并行开发任务
@@ -467,6 +467,8 @@ python3 tools/ble_gatt_smoke_test.py --run-smoke --include-destructive
 ```
 
 如果输出 `CoreBluetooth reported 'BLE is unsupported'`，说明当前电脑运行环境不能访问 macOS 蓝牙后端，尚未进入设备扫描阶段，不代表 nRF 设备失败。
+
+2026-06-16 当前 Mac 环境已跑通非破坏性 `--run-smoke`；如果后续再次出现 CoreBluetooth 后端错误，应先排查本机蓝牙权限或运行环境，而不是直接判断固件失败。
 
 ## 当前限制和后续变化
 

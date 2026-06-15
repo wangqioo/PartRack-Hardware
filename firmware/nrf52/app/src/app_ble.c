@@ -18,6 +18,7 @@
 #include "viberack_adv_payload.h"
 #include "viberack_ble_dispatcher_model.h"
 #include "viberack_ble_lifecycle.h"
+#include "viberack_read_all_pacer.h"
 
 LOG_MODULE_REGISTER(app_ble, LOG_LEVEL_INF);
 
@@ -35,6 +36,8 @@ static struct bt_conn *current_conn;
 static uint8_t battery_pct = 100;
 static vbrk_ble_lifecycle_t ble_lifecycle;
 static struct k_work ble_lifecycle_work;
+static vbrk_read_all_pacer_t read_all_pacer;
+static struct k_work_delayable read_all_work;
 
 static struct bt_uuid_128 binding_service_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_BINDING_SERVICE);
 static struct bt_uuid_128 binding_cp_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_BINDING_CP);
@@ -49,6 +52,12 @@ static void ble_lifecycle_work_handler(struct k_work *work)
 {
     ARG_UNUSED(work);
     vbrk_ble_lifecycle_process(&ble_lifecycle);
+}
+
+static void read_all_work_handler(struct k_work *work)
+{
+    ARG_UNUSED(work);
+    vbrk_read_all_pacer_process(&read_all_pacer);
 }
 
 static unsigned int lifecycle_lock(void *user_data)
@@ -135,6 +144,12 @@ static int dispatcher_read_one(uint8_t slot, vbrk_slot_record_t *record, void *u
     return binding_table_read_one(slot, record);
 }
 
+static void read_all_schedule_next(uint16_t delay_ms, void *user_data)
+{
+    ARG_UNUSED(user_data);
+    (void)k_work_schedule(&read_all_work, K_MSEC(delay_ms));
+}
+
 static int dispatcher_write_one(const vbrk_slot_record_t *record, void *user_data)
 {
     ARG_UNUSED(user_data);
@@ -191,6 +206,27 @@ static void dispatcher_table_changed(void *user_data)
     app_ble_report_binding_changed();
 }
 
+static void notify_binding_status(uint8_t op, int err)
+{
+    (void)app_ble_notify_binding_result(op, vbrk_ble_status_from_errno(err),
+                                        NULL, 0);
+}
+
+static bool handle_read_all_async(const uint8_t *frame, uint16_t len)
+{
+    if (frame[0] != VBRK_OP_READ_ALL) {
+        return false;
+    }
+
+    if (len != 1) {
+        notify_binding_status(VBRK_OP_READ_ALL, -EINVAL);
+        return true;
+    }
+
+    vbrk_read_all_pacer_start(&read_all_pacer);
+    return true;
+}
+
 static ssize_t binding_cp_write(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                 const void *buf, uint16_t len, uint16_t offset,
                                 uint8_t flags)
@@ -216,6 +252,10 @@ static ssize_t binding_cp_write(struct bt_conn *conn, const struct bt_gatt_attr 
 
     if (offset != 0 || len < 1) {
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    }
+
+    if (handle_read_all_async(frame, len)) {
+        return len;
     }
 
     (void)vbrk_ble_dispatch_binding_cp(&dispatcher, frame, len);
@@ -300,6 +340,8 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
         bt_conn_unref(current_conn);
         current_conn = NULL;
     }
+    vbrk_read_all_pacer_cancel(&read_all_pacer);
+    (void)k_work_cancel_delayable(&read_all_work);
     vbrk_ble_lifecycle_disconnected(&ble_lifecycle);
     app_status_set_ble_connected(false);
 }
@@ -411,7 +453,15 @@ int app_ble_init(void)
     int err;
 
     k_work_init(&ble_lifecycle_work, ble_lifecycle_work_handler);
+    k_work_init_delayable(&read_all_work, read_all_work_handler);
     vbrk_ble_lifecycle_init(&ble_lifecycle, &adapter);
+    vbrk_read_all_pacer_init(&read_all_pacer,
+                             &(vbrk_read_all_pacer_adapter_t) {
+                                 .read_one = dispatcher_read_one,
+                                 .notify_binding = dispatcher_notify_binding,
+                                 .schedule_next = read_all_schedule_next,
+                                 .user_data = NULL,
+                             });
 
     err = bt_enable(NULL);
     if (err != 0) {

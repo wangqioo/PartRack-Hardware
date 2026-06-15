@@ -182,11 +182,7 @@ async def run_smoke(device_name: str, include_destructive: bool) -> None:
         await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["read_all"])
         await wait_for_read_all_end(notifications)
         validate_read_all_partial_notifications(notifications, expected_slot1_record())
-        if bytes([0x02, 0x00, 0xFF]) not in notifications:
-            print(
-                "read_all_end_marker: missing; firmware likely needs paced READ_ALL notifications",
-                file=sys.stderr,
-            )
+        validate_read_all_notifications(notifications)
 
         notifications.clear()
         await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["set_slot1_qty_42"])

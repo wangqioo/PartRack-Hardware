@@ -22,5 +22,6 @@ target_sources(app PRIVATE
   ../../../protocol/viberack_light_policy.c
   ../../../protocol/viberack_light_state.c
   ../../../protocol/viberack_protocol.c
+  ../../../protocol/viberack_read_all_pacer.c
   ../../../protocol/viberack_storage.c
 )

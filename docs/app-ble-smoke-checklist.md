@@ -26,5 +26,6 @@
 ## 电脑脚本烟测
 
 - [ ] `python3 tools/ble_gatt_smoke_test.py --print-vectors` 可输出测试帧。
-- [ ] 可用 BLE 后端环境中再运行真实 `--run-smoke`。
+- [x] 2026-06-16 Mac CoreBluetooth/Bleak + XIAO 实机运行真实 `--run-smoke` 通过，覆盖 `WRITE_ONE -> READ_ONE`、`READ_ALL` 结束帧和 `SET_QTY`。
+- [ ] 后续在 Android APP 侧复验同一流程。
 - [ ] macOS CoreBluetooth 后端不可用时，不能把脚本单测当成真实 BLE 通过。

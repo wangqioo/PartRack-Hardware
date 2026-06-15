@@ -71,6 +71,11 @@ run_host_checks() {
     -o /tmp/ble_lifecycle_test
   /tmp/ble_lifecycle_test
 
+  cc -std=c11 -Wall -Wextra -Iprotocol \
+    tools/read_all_pacer_test.c protocol/viberack_ble_dispatcher_model.c protocol/viberack_read_all_pacer.c \
+    -o /tmp/read_all_pacer_test
+  /tmp/read_all_pacer_test
+
   python3 tools/protocol_check.py
   python3 tools/binding_table_model_test.py
   python3 tools/ble_gatt_smoke_test_test.py

@@ -254,7 +254,7 @@ python3 -m venv .venv
 .venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke
 ```
 
-自动烟测会连接 `VBRK-0000`，读取 `Table Info` / `Light Status`，开启 Binding Control Point notify，写入第 1 槽，发送 `READ_ONE` 校验读回的 16B 槽位记录，发送 `READ_ALL` 校验至少返回第 1 槽记录，并发送 `SET_QTY` 校验状态 notify。
+自动烟测会连接 `VBRK-0000`，读取 `Table Info` / `Light Status`，开启 Binding Control Point notify，写入第 1 槽，发送 `READ_ONE` 校验读回的 16B 槽位记录，发送 `READ_ALL` 校验第 1 槽记录和 `02 00 FF` 结束帧，并发送 `SET_QTY` 校验状态 notify。
 
 2026-06-12 当前本机执行结果：
 
@@ -323,7 +323,7 @@ BLE backend is unavailable: CoreBluetooth reported 'BLE is unsupported'. This us
 
 该错误仍发生在 CoreBluetooth 后端初始化阶段，尚未进入 `VBRK-0000` 设备扫描，不能作为固件广播、连接或 GATT 失败判断。M0 下一步切到手机 nRF Connect 手工验证：订阅 Binding Control Point notify，执行 `WRITE_ONE -> READ_ONE`、`READ_ALL`、`SET_QTY`，并记录原始 notify 字节。
 
-## 2026-06-16 M0 BLE smoke 通过项和缺口
+## 2026-06-16 M0 BLE smoke、配对和 READ_ALL pacing 记录
 
 2026-06-16 已将开发期配对容量从 1 个 peer 扩到 4 个 peer，并启用 key 满时覆盖最旧记录：
 
@@ -338,7 +338,7 @@ CONFIG_BT_KEYS_OVERWRITE_OLDEST=y
 app_ble: security changed: level 2
 ```
 
-当前烧录的 bare UF2：
+第一次通过 encrypted write 的 bare UF2：
 
 ```text
 /Users/wq/ncs/build-partrack-PartRack-Hardware-xiao-sense-bare/app/zephyr/zephyr.uf2
@@ -373,9 +373,45 @@ binding_notify: 30 00
 - `READ_ALL` 至少返回 slot 1 记录和后续空槽记录。
 - `SET_QTY slot 1 -> 42` 返回 `30 00`。
 
-仍需修复：
+该轮暴露的缺口：
 
 - 真实 BLE 下 `READ_ALL` 没有收到 `02 00 FF` 结束帧。当前 GATT write callback 内连续发送 26 个 notify，真实 TX 队列可能在第二帧后暂时不可用；固件需要将 `READ_ALL` 改为 paced/asynchronous notify，或在 notify busy 时排队重试。
+
+同日已完成修复：固件将 `READ_ALL` 从 GATT write callback 内同步连续 notify，改为 Zephyr delayable work 驱动的 paced/asynchronous notify。每次 work 只发送一条槽位记录；notify 成功后进入下一槽，notify 失败时延迟重试同一槽，25 槽发送完成后再发送 `02 00 FF` 结束帧。
+
+修复后烧录的 bare UF2：
+
+```text
+/Users/wq/ncs/build-partrack-PartRack-Hardware-xiao-sense-bare/app/zephyr/zephyr.uf2
+SHA-256: 53f357028fe87e618ade4e3dd77cf18296b8bdaeef463481108a4e8a2e291541
+```
+
+修复后验证命令：
+
+```bash
+tools/verify_host.sh --host-only
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-smoke
+```
+
+2026-06-16 本机结果退出码均为 0，真实 BLE smoke 关键输出：
+
+```text
+table_info: 05 00 00 00 21 F5 19
+light_status: 00 00 00
+binding_notify: 10 00
+binding_notify: 01 00 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18
+binding_notify: 02 00 01 43 31 32 33 34 35 36 37 00 00 0C 00 00 00 18
+binding_notify: 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+... 中间继续收到空槽记录 ...
+binding_notify: 02 00 FF
+binding_notify: 30 00
+```
+
+修复后新增实机结论：
+
+- `READ_ALL` 在 XIAO nRF52840 Sense 真实 BLE 上可以返回逐槽记录和 `02 00 FF` 结束帧。
+- `tools/ble_gatt_smoke_test.py --run-smoke` 已恢复对 `READ_ALL` 结束帧的硬性校验；缺少 `02 00 FF` 会失败，不再只打印警告。
+- 当前结论只覆盖 Seeed Studio XIAO nRF52840 Sense + bare PartRack firmware + Mac CoreBluetooth/Bleak；仍需 Android APP 和 nRF52832 目标板复验。
 
 ### BLE 加密配对经验总结
 
@@ -388,7 +424,7 @@ binding_notify: 30 00
 - macOS / Bleak 不能可靠显式 pair。CoreBluetooth 通常只在外设或受保护 characteristic 触发安全流程时弹系统提醒；脚本侧需要识别 `Encryption is insufficient` / `Authentication is insufficient`，等待系统完成配对后重试。
 - `CONFIG_BT_MAX_PAIRED=1` 在开发期太小。手机 nRF Connect 可能已经占用唯一 pairing key 槽，Mac 作为第二个 peer 请求配对时，固件 `bt_conn_set_security()` 返回 `-12`。开发期使用 `CONFIG_BT_MAX_PAIRED=4` 并启用 `CONFIG_BT_KEYS_OVERWRITE_OLDEST=y`，避免多个测试客户端互相卡住。
 - 串口日志是判断配对是否真的成功的关键证据。成功标志是 `security changed: level 2`；失败标志之一是 `failed to request encrypted link: -12`。
-- 真实 BLE notify 时序不能用 host/model 结果外推。`READ_ALL` 模型里能连续发 25 条记录和结束帧，但真实 BLE TX 队列会限制连续 notify，后续需要做 paced/asynchronous notify。
+- 真实 BLE notify 时序不能用 host/model 结果外推。`READ_ALL` 模型里能连续发 25 条记录和结束帧，但真实 BLE TX 队列会限制连续 notify；固件侧应使用 paced/asynchronous notify，并处理 notify busy 后的重试。
 
 后续同类问题排查顺序：
 
