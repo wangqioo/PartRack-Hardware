@@ -8,10 +8,26 @@
 https://github.com/Yrd980/LCSC_android_erp.git
 ```
 
-当前仓库根据两份项目文档初始化：
+当前执行计划见 [docs/development-plan.md](docs/development-plan.md)，验证事实状态以 [docs/verification-matrix.md](docs/verification-matrix.md) 为准。
 
-- `智能物料管理系统_项目技术文档_v1.0`
-- `智能底盘BLE接口规格_v0.1`
+## 当前状态
+
+截至 2026-06-16，M0 在 Seeed Studio XIAO nRF52840 Sense + Mac CoreBluetooth/Bleak 范围内已经基本打通：
+
+- BLE 扫描、连接、service discovery 已实机通过。
+- `Table Info`、Binding Control Point、`WRITE_ONE -> READ_ONE`、paced `READ_ALL`、`SET_QTY` 已实机通过。
+- settings/NVS 单槽重启恢复已实机通过。
+- Light Command / Light Status、10s 超时自动 OFF 已实机通过。
+- Device Health Service 已实机读取，样例 payload：`64 02 00 00`。
+- 本机 host/model 测试和 XIAO bare/peripheral Zephyr build 已纳入 `tools/verify_host.sh`。
+
+当前阶段已经进入：
+
+1. 破坏性绑定表实机验证。
+2. Android APP BLE 联调。
+3. 真实 WS2812 灯条、电源门控、NFC 和 nRF52832 目标板验证。
+
+注意：XIAO nRF52840 Sense 的实机证据不能自动外推为 nRF52832 目标板或量产硬件证据。
 
 ## 项目范围
 
@@ -29,8 +45,6 @@ https://github.com/Yrd980/LCSC_android_erp.git
 
 v1.5/v2 见 [docs/roadmap.md](docs/roadmap.md)。
 
-当前执行计划见 [docs/development-plan.md](docs/development-plan.md)。
-
 当前开发板 bring-up 资料见 [docs/xiao-nrf52840-bringup.md](docs/xiao-nrf52840-bringup.md)。
 
 Android APP 对接指南见 [docs/android-ble-integration-guide.md](docs/android-ble-integration-guide.md)。
@@ -38,6 +52,47 @@ Android APP 对接指南见 [docs/android-ble-integration-guide.md](docs/android
 开发期 BLE/GATT 烟测脚本依赖见 [requirements-dev.txt](requirements-dev.txt)。
 
 本机一键验证脚本：`tools/verify_host.sh`。
+
+## 常用命令
+
+主机侧协议、模型和脚本测试：
+
+```bash
+tools/verify_host.sh --host-only
+```
+
+构建 XIAO 裸板 BLE 验证固件：
+
+```bash
+tools/verify_host.sh --bare-build
+```
+
+构建 XIAO 外设 variant：
+
+```bash
+tools/verify_host.sh --peripheral-build
+```
+
+打印 BLE/GATT 测试帧：
+
+```bash
+python3 tools/ble_gatt_smoke_test.py --print-vectors
+```
+
+电脑连接真实设备做非破坏性 BLE 批量验证：
+
+```bash
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-batch
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-persistence-read
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-light-timeout
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-device-health
+```
+
+破坏性绑定表验证会清空或移动测试数据，只在明确测试窗口内执行：
+
+```bash
+.venv/bin/python tools/ble_gatt_smoke_test.py --run-destructive-binding
+```
 
 ## 目录
 
@@ -49,12 +104,13 @@ protocol/           跨端协议常量、帧格式和测试
 tools/              本地开发/模拟/校验工具
 ```
 
-## 开发优先级
+## 当前开发优先级
 
-1. 固化 BLE 协议和二进制帧测试。
-2. 固件实现绑定表、灯控和 READ_ALL/WRITE_ONE 最小闭环。
-3. 主控板、灯条 PCB 和结构件打样资料成型。
-4. 提供 BLE 模拟器或测试夹具，供 APP 仓库联调。
+1. 跑破坏性绑定表窗口：`CLEAR_ONE`、`INSERT_AT`、`MOVE_BLOCK`、`REMOVE_AT`、`FACTORY_RESET`，并补重启恢复证据。
+2. Android APP 侧复验扫描、连接、配对/加密重试、Binding CP notify、`READ_ALL` 结束帧和断开重连。
+3. 烧录 peripheral variant，验证 D3/P0.29 电源门控和 25 颗 WS2812 槽位/颜色/超时熄灯。
+4. 接入 NT3H2111 I2C / NDEF / FD 唤醒，验证 NFC 触碰路由。
+5. 回到 nRF52832 目标板迁移、功耗、电池 ADC、watchdog release 策略和 OTA/Secure DFU。
 
 ## 关键约束
 
