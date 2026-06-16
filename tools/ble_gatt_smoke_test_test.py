@@ -8,6 +8,7 @@ from ble_gatt_smoke_test import (
     is_encryption_error,
     make_test_vectors,
     validate_destructive_binding_flow,
+    validate_device_health,
     validate_light_status,
     validate_light_timeout_off,
     validate_read_all_partial_notifications,
@@ -218,6 +219,24 @@ def test_destructive_binding_flow_validation_rejects_missing_phase() -> None:
         raise AssertionError("expected SmokeValidationError")
 
 
+def test_device_health_validation_checks_shape_and_battery_range() -> None:
+    validate_device_health(bytes.fromhex("64 02 00 00"))
+
+    try:
+        validate_device_health(bytes.fromhex("65 02 00 00"))
+    except SmokeValidationError as exc:
+        assert "battery_pct" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+    try:
+        validate_device_health(bytes.fromhex("64 02 00"))
+    except SmokeValidationError as exc:
+        assert "Device Health length" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
 def test_status_validation_rejects_missing_status() -> None:
     try:
         validate_status_notification([bytes.fromhex("10 00")], 0x30)
@@ -262,6 +281,7 @@ if __name__ == "__main__":
     test_light_timeout_validation_requires_off_status()
     test_destructive_binding_flow_validation_checks_mutations()
     test_destructive_binding_flow_validation_rejects_missing_phase()
+    test_device_health_validation_checks_shape_and_battery_range()
     test_status_validation_rejects_missing_status()
     test_explains_corebluetooth_unsupported_error()
     test_detects_corebluetooth_encryption_errors()

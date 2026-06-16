@@ -33,7 +33,7 @@
   - 绿灯慢闪：固件 ready，正在广播，未连接。
   - 蓝灯常亮：BLE 已连接。
 - 已新增电脑侧 BLE/GATT 烟测辅助脚本：`tools/ble_gatt_smoke_test.py`。
-- BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录、paced `READ_ALL` 结束帧、`SET_QTY` 后读回、Table Info seq/CRC、Light Status 状态变化和单槽重启恢复，并可选执行 `CLEAR_ONE` / `FACTORY_RESET`；2026-06-16 已在 Mac CoreBluetooth/Bleak + XIAO 实机上跑通非破坏性批量验证。
+- BLE/GATT 烟测脚本已能校验 `WRITE_ONE -> READ_ONE` 的完整 16B 槽位记录、paced `READ_ALL` 结束帧、`SET_QTY` 后读回、Table Info seq/CRC、Light Status 状态变化、单槽重启恢复、灯控 10s 超时 OFF 和 Device Health 4B payload，并可选执行 `CLEAR_ONE` / `FACTORY_RESET`；2026-06-16 已在 Mac CoreBluetooth/Bleak + XIAO 实机上跑通非破坏性批量验证。
 - 已新增本机一键验证脚本：`tools/verify_host.sh`。
 - 已新增验证证据台账：[verification-matrix.md](verification-matrix.md)，后续 host/model/build/hardware 证据状态以该台账为准。
 - 已实现 BLE lifecycle host model：
@@ -71,6 +71,7 @@
 - 已扩展电脑侧 BLE/GATT 烟测脚本：
   - `--run-destructive-binding` 覆盖 `CLEAR_ONE`、`INSERT_AT`、`SET_QTY`、`MOVE_BLOCK`、`REMOVE_AT`、`FACTORY_RESET` 的校验流程。
   - `--run-light-timeout` 覆盖 FIND 后等待超时自动 OFF 的读取流程。
+  - `--run-device-health` 覆盖 Device Health 4B 只读检查。
 
 当前仍未完成：
 
@@ -78,7 +79,7 @@
 - 灯控硬件输出：GATT 接口、状态框架、电源门控、25 槽 RGB 帧生成和 XIAO Zephyr WS2812 SPI 输出绑定已完成；真实 D3/P0.29 电源门控、25 颗 WS2812 灯条颜色/槽位/超时熄灯仍需实测。
 - BLE/APP 侧复验：XIAO + Mac 已通过 encrypted Binding CP、`WRITE_ONE -> READ_ONE`、paced `READ_ALL`、`SET_QTY` 读回和 Light Command 状态闭环；Android APP 侧配对/加密重试、断开重连长稳、notify 订阅顺序和 nRF52832 radio 行为仍需复验。
 - NFC / NT3H2111：NFC FD GPIO 唤醒入口已实现并可编入 peripheral build，但 NT3H2111 I2C/NDEF、URI 写入和手机触碰路由尚未接入。
-- Device Health 已完成软件接入；复位原因、看门狗、电池 ADC 仍需要实机样本、目标板 alias、标定和 release 策略。
+- Device Health 已完成软件接入，并已在 XIAO/Mac 上读到 `64 02 00 00`；复位原因仍需补多类型样本，看门狗、电池 ADC 仍需要目标板 alias、标定和 release 策略。
 - 低功耗、OTA/DFU、nRF52832 目标迁移仍未完成。
 
 ## 待开发队列

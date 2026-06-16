@@ -13,6 +13,7 @@ BINDING_CP_UUID = "7f4b1001-8d1a-4d45-9a4e-2b4a7c000000"
 TABLE_INFO_UUID = "7f4b1002-8d1a-4d45-9a4e-2b4a7c000000"
 LIGHT_COMMAND_UUID = "7f4b2001-8d1a-4d45-9a4e-2b4a7c000000"
 LIGHT_STATUS_UUID = "7f4b2002-8d1a-4d45-9a4e-2b4a7c000000"
+DEVICE_HEALTH_UUID = "7f4b3001-8d1a-4d45-9a4e-2b4a7c000000"
 FACTORY_RESET_MAGIC_LE = bytes.fromhex("A5 A5 5A 5A")
 
 
@@ -163,6 +164,13 @@ def validate_light_timeout_off(samples: list[bytes]) -> None:
 
     observed = ", ".join(hex_bytes(data) for data in samples) or "<none>"
     raise SmokeValidationError(f"Light Status timeout OFF was not observed; observed: {observed}")
+
+
+def validate_device_health(data: bytes) -> None:
+    if len(data) != 4:
+        raise SmokeValidationError(f"Device Health length should be 4 bytes; got {len(data)}")
+    if data[0] > 100:
+        raise SmokeValidationError(f"Device Health battery_pct should be <= 100; got {data[0]}")
 
 
 def _record_for_slot(slot: int, qty: int = 12) -> bytes:
@@ -535,6 +543,22 @@ async def run_light_timeout(device_name: str) -> None:
         validate_light_timeout_off(samples)
 
 
+async def run_device_health(device_name: str) -> None:
+    try:
+        from bleak import BleakClient
+    except ImportError as exc:
+        raise SystemExit(
+            "bleak is required for --run-device-health: python3 -m pip install bleak"
+        ) from exc
+
+    device = await find_device(device_name)
+
+    async with BleakClient(device) as client:
+        health = bytes(await client.read_gatt_char(DEVICE_HEALTH_UUID))
+        print(f"device_health: {hex_bytes(health)}")
+        validate_device_health(health)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="PartRack BLE GATT smoke helper")
     parser.add_argument("--device-name", default=DEVICE_NAME)
@@ -544,6 +568,7 @@ def main() -> int:
     parser.add_argument("--run-persistence-read", action="store_true")
     parser.add_argument("--run-destructive-binding", action="store_true")
     parser.add_argument("--run-light-timeout", action="store_true")
+    parser.add_argument("--run-device-health", action="store_true")
     parser.add_argument(
         "--include-destructive",
         action="store_true",
@@ -557,6 +582,7 @@ def main() -> int:
         or args.run_persistence_read
         or args.run_destructive_binding
         or args.run_light_timeout
+        or args.run_device_health
     )
 
     if args.print_vectors or not requested_run:
@@ -572,6 +598,8 @@ def main() -> int:
         asyncio.run(run_destructive_binding(args.device_name))
     if args.run_light_timeout:
         asyncio.run(run_light_timeout(args.device_name))
+    if args.run_device_health:
+        asyncio.run(run_device_health(args.device_name))
 
     return 0
 
