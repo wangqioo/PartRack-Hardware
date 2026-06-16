@@ -118,6 +118,15 @@
 
 当前 APP 可以开始并行接入 BLE，不需要等最终 nRF52832 硬件回来。开发期先以 XIAO nRF52840 Sense 上的 `VBRK-0000` 为目标设备。
 
+2026-06-16 已给 XIAO 烧录 peripheral 完整版固件，供软件侧测试：
+
+```text
+/Users/wq/ncs/build-partrack-PartRack-Hardware-xiao-sense-peripherals/app/zephyr/zephyr.uf2
+SHA-256: 25514abd08d93a7154a704e4b9a151acb4f7823dca6617c8cb043741ea972689
+```
+
+烧录后 Mac 已验证 `--run-device-health` 和 `--run-batch`，设备可连接，Device Health 返回 `64 02 00 00`，Binding/Light 非破坏性闭环正常。
+
 APP 现在可以做：
 
 - 扫描设备名 `VBRK-0000`，后续量产按 `VBRK-` 前缀过滤。
@@ -148,7 +157,8 @@ APP 侧需要注意：
 - Binding Control Point 当前是 encrypted write；Android 写入前要处理配对/加密，遇到 authentication/encryption 错误后触发系统配对再重试。
 - `CLEAR_ONE` 和 `FACTORY_RESET` 属于破坏性测试，只能在测试设备和测试数据上执行。
 - `VBRK-0000`、Company ID `0xFFFF`、`batch_id = 1` 都是开发期占位值，APP 不要写死为量产假设。
-- 当前 NFC URI、OTA 和电池 ADC 还没有接入，APP 先不要依赖这些能力。
+- 当前 NFC URI、OTA 和真实电池 ADC 还没有接入，APP 先不要依赖这些能力。
+- 真实 WS2812 槽位颜色只有在测试设备接好灯条和供电后才可作为验收项。
 - Binding Table 单槽持久化已在 XIAO 实机完成“写入 -> 重启 -> 读回”；多槽/破坏性操作恢复和真实灯条颜色验证仍需补证。
 
 APP 同学主要看这几份文档：

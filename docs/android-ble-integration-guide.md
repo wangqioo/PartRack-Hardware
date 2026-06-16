@@ -7,9 +7,35 @@
 - 开发板：Seeed Studio XIAO nRF52840 Sense。
 - 固件工具链：nRF Connect SDK / Zephyr。
 - 当前设备名：`VBRK-0000`。
-- 当前已实机验证：手机可扫描、连接、发现 GATT 服务、读取 `Table Info` 和 `Light Status`。
-- 当前已脚本化并在 XIAO 实机通过：Mac CoreBluetooth/Bleak 自动 smoke 可完成 encrypted `WRITE_ONE -> READ_ONE` notify 闭环、paced `READ_ALL` 结束帧、`SET_QTY` 后读回、Light Status 状态变化和单槽重启恢复。
+- 当前已烧录固件：peripheral 完整版 XIAO UF2。
+- 当前 UF2 路径：`/Users/wq/ncs/build-partrack-PartRack-Hardware-xiao-sense-peripherals/app/zephyr/zephyr.uf2`。
+- 当前 UF2 SHA-256：`25514abd08d93a7154a704e4b9a151acb4f7823dca6617c8cb043741ea972689`。
+- 当前已实机验证：手机/Mac 可扫描、连接、发现 GATT 服务、读取 `Table Info`、`Light Status` 和 Device Health。
+- 当前已脚本化并在 XIAO 实机通过：Mac CoreBluetooth/Bleak 自动 smoke 可完成 encrypted `WRITE_ONE -> READ_ONE` notify 闭环、paced `READ_ALL` 结束帧、`SET_QTY` 后读回、Light Status 状态变化、10s 超时 OFF、Device Health 读取和单槽重启恢复。
 - 当前固件已接入 settings/NVS 持久化和 XIAO WS2812 SPI 输出绑定；单槽“写入 -> 重启 -> 读回”已通过，真实灯条点亮仍待确认。
+
+## 当前给软件侧测试的固件
+
+2026-06-16 已给 nRF52840/XIAO 烧录 peripheral 完整版固件。该固件用于 APP/BLE 联调，不是裸板最小验证版。
+
+APP 侧现在可以重点测试：
+
+1. 扫描 `VBRK-0000` 并连接。
+2. `discoverServices()` 后确认三个 service 都存在：Binding Table、Light Control、Device Health。
+3. 处理 Binding Control Point 的 encrypted write：首次写入遇到加密/认证错误时触发系统配对，然后重试。
+4. 开启 Binding CP notify，执行 `WRITE_ONE -> READ_ONE`。
+5. 执行 `READ_ALL`，等待 `02 00 FF` 结束帧。
+6. 执行 `SET_QTY`，确认 notify 和 `Table Info.table_seq` 变化。
+7. 下发 Light Command，读取或订阅 `Light Status`。
+8. 连接后读取 Device Health，当前实测样例为 `64 02 00 00`。
+
+暂时不要作为 APP 必须依赖的能力：
+
+- NFC URI / NT3H2111 NDEF。
+- OTA / Secure DFU。
+- 真实电池 ADC 百分比。
+- 真实 WS2812 槽位颜色，除非测试设备已经接好灯条和供电。
+- 破坏性绑定表命令，除非明确进入测试窗口。
 
 ## 当前 APP 可并行开发任务
 
@@ -24,6 +50,7 @@ APP 同学现在可以不等最终 PCB，直接按当前 XIAO nRF52840 Sense 固
 | 单槽写入 | `WRITE_ONE` 后 `READ_ONE` 比对 16B 记录 | Binding CP 写入需要加密/配对 |
 | 库存数量 | 用 `SET_QTY` 修改槽位数量 | 成功后应观察 notify 和 `table_seq` 变化 |
 | 灯控 | 下发 `FIND` / `PICK` / `SORT` / `STOCK_IN` / `OFF` | 真实灯条颜色仍待硬件实测 |
+| Device Health | 连接后读取 `7f4b3001-...` | 当前实测 `64 02 00 00`；电池仍是开发板占位 |
 
 建议先实现这个最小闭环：
 
@@ -34,6 +61,7 @@ discoverServices
 read Table Info
 enable Binding CP notify
 enable Table Info notify
+read Device Health
 WRITE_ONE slot 1
 READ_ONE slot 1
 READ_ALL until 02 00 FF
@@ -47,7 +75,7 @@ read or subscribe Light Status
 - 设备名固定为 `VBRK-0000`。
 - Manufacturer Company ID 为 `0xFFFF`。
 - `batch_id = 1`。
-- NFC URI、OTA、电池 ADC 已在硬件计划中，但当前固件还没有提供 APP 可用接口。
+- NFC URI、OTA、真实电池 ADC 已在硬件计划中，但当前固件还没有提供 APP 可用接口。
 
 ## 角色边界
 
