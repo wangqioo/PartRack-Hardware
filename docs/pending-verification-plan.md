@@ -35,12 +35,16 @@
 | WS2812 frame 生成 | `mask_a/mask_b` 生成 25 槽 RGB frame，B 覆盖 A。 | `tools/light_frame_test.c` host verified。 | 接灯条，发送单槽、多槽、A/B 重叠命令。 | 对应槽位颜色正确，B 覆盖 A，越界 bit 不影响 25 槽。 |
 | WS2812 Zephyr 输出 | XIAO peripheral build 使用 `worldsemi,ws2812-spi`，25 像素，GRB，4 MHz。 | `tools/verify_host.sh --peripheral-build` 已确认编入驱动。 | 接真实 25 颗 WS2812，烧 peripheral build。 | 灯条按 Light Command 亮灭，颜色和槽位正确。 |
 | NFC FD GPIO 唤醒入口 | `vbrk-nfc-fd` GPIO adapter 和 debounce 入口已实现。 | peripheral build 可编入 alias；未接真实 NT3H2111。 | 接 NT3H2111 FD 引脚，触碰 NFC。 | FD 中断触发后固件进入预期唤醒/广播刷新路径。 |
+| Device Health Service | `7f4b0003...` service 和 `7f4b3001...` Device Health characteristic 已实现，返回 battery_pct、reset_reason、health_flags。 | `tools/device_health_test.c` host verified；裸 XIAO 和 peripheral build 均已编入 `hwinfo`/watchdog driver。 | 手机或 Mac 读取 Device Health；单击 reset、软件 reset、看门狗启用窗口分别采样。 | payload 4B；reset_reason 与触发方式一致；watchdog enabled/fault flags 合理。 |
+| 复位原因上报 | 启动时读取 Zephyr `hwinfo_get_reset_cause()`，映射到协议 bitmask 后清除硬件累计标志。 | `tools/device_health_test.c` 覆盖 payload 编码；Zephyr build verified。 | 实机分别做上电、reset pin、软件 reset、看门狗 reset。 | Device Health `reset_reason` 能区分对应原因，日志和 BLE 读取一致。 |
+| 看门狗骨架 | Zephyr watchdog driver 已编译；固件有 `CONFIG_VBRK_WATCHDOG_ENABLE` 开关、8s timeout、主循环喂狗。默认不开启。 | 裸 XIAO/peripheral build verified；当前默认不会启动 watchdog。 | 打开开关烧录专用验证固件，正常运行不复位；刻意停止喂狗后复位。 | 正常喂狗稳定运行；异常复位后 Device Health 显示 watchdog bit。 |
+| 电池 ADC 软件入口 | `vbrk-battery-adc` devicetree alias 存在时采样 ADC 并换算 0-100%；无 alias 时开发板返回 100。 | `tools/device_health_test.c` 覆盖百分比换算；当前 XIAO 裸板无 alias。 | 目标板分压回来后添加 alias，接电源表/可调电源做标定。 | 电压读数单调，百分比范围合理，低电量广播 flag 触发。 |
 
 ## 已做工具和模型但待真实环境补证
 
 | 工具 / 模型 | 已完成内容 | 当前限制 | 后续验证 |
 |---|---|---|---|
-| `tools/ble_gatt_smoke_test.py` | 生成测试帧；可自动连接、订阅 notify；`--run-smoke` 覆盖基础非破坏性 smoke；`--run-batch` 覆盖 Table Info、`SET_QTY` 读回和 Light Status；`--run-persistence-read` 覆盖重启后读回。 | 2026-06-16 已可在当前 Mac 跑通 `--run-batch` 和 `--run-persistence-read`。 | 后续用它做 APP 对照、nRF52832 目标板复验和破坏性命令窗口验证。 |
+| `tools/ble_gatt_smoke_test.py` | 生成测试帧；可自动连接、订阅 notify；`--run-smoke` 覆盖基础非破坏性 smoke；`--run-batch` 覆盖 Table Info、`SET_QTY` 读回和 Light Status；`--run-persistence-read` 覆盖重启后读回；`--run-destructive-binding` 覆盖 CLEAR/INSERT/SET_QTY/MOVE/REMOVE/FACTORY_RESET；`--run-light-timeout` 覆盖超时 OFF。 | 2026-06-16 已可在当前 Mac 跑通 `--run-batch` 和 `--run-persistence-read`；新 destructive/light-timeout 流程已有 host-side validator。 | 后续用它做 APP 对照、nRF52832 目标板复验、破坏性命令窗口和灯控超时验证。 |
 | BLE lifecycle host model | 覆盖断开后恢复广播、connected 状态延迟刷新、notify 失败不回滚 domain 操作。 | 不证明真实 radio、手机栈、实际 notify 顺序。 | 手机实测断开重连、写入后广播数据刷新和 notify 顺序。 |
 | Binding Table host/model tests | 覆盖槽位操作、记录编码、CRC snapshot。 | 不证明 Zephyr settings/NVS 与 flash 实际写入成功。 | 做“写入 -> 重启 -> 读回”真实设备闭环。 |
 | Light policy/frame/state tests | 覆盖超时、模式、25 槽 RGB frame 和状态切换。 | 不证明 GPIO、电源门控和真实 WS2812 时序。 | 接真实硬件测 GPIO 和灯条。 |
@@ -50,12 +54,11 @@
 | 功能 | 当前状态 | 下一步 |
 |---|---|---|
 | NT3H2111 I2C / NDEF | 尚未完整接入。 | 确认 I2C 地址和引脚，读取 tag memory，写入 `lcscerp://device?...` URI，验证手机触碰路由。 |
-| 电池 ADC | 尚未接入。 | 按 Seeed 电池读取注意事项处理 `P0.14` 和 `P0.31`，实现电压读取、百分比估算和广播字段更新。 |
+| 电池 ADC 标定和目标板 alias | 软件入口已接入；当前 XIAO 裸板没有 `vbrk-battery-adc` alias，仍返回 100%。 | 目标板分压方案回来后添加 devicetree alias，按 Seeed/目标板注意事项处理 ADC 量程、分压和校准曲线。 |
 | 低功耗 | 尚未形成实测方案。 | 定义广播、连接、灯条关闭、灯条点亮等电流测试场景，接电源表记录。 |
 | OTA / Secure DFU | 尚未集成，是 v1 release gate。 | 决定 beta 是否需要 OTA；集成 MCUboot/DFU，验证升级、失败处理和回滚策略。 |
 | nRF52832 目标迁移 | 当前主要在 XIAO nRF52840 Sense 验证。 | 在 `nrf52dk_nrf52832` 或目标板上构建/烧录，复核 Flash/RAM、引脚、功耗和灯条驱动方案。 |
-| 复位原因上报 | 文档列为待开发。 | 接入 Zephyr reset reason 或芯片寄存器读取，定义 BLE 上报格式。 |
-| 看门狗 | 尚未作为 release 行为接入和验证。 | 设定 watchdog 策略，验证正常喂狗和异常复位上报。 |
+| 看门狗 release 策略 | 软件骨架已接入，默认未启用。 | 定义量产是否开启、timeout、调试暂停策略、异常复位上报和验证窗口。 |
 
 ## 推荐验证顺序
 

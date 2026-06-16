@@ -1,0 +1,14 @@
+source "Kconfig.zephyr"
+
+menu "PartRack application options"
+
+config VBRK_WATCHDOG_ENABLE
+    bool "Enable PartRack watchdog feeding"
+    default n
+    depends on WATCHDOG
+    help
+      Enables the hardware watchdog setup in the PartRack application.
+      Keep this disabled for normal bring-up builds until the watchdog
+      reset path has been explicitly validated.
+
+endmenu

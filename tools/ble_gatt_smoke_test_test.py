@@ -7,7 +7,9 @@ from ble_gatt_smoke_test import (
     explain_ble_backend_error,
     is_encryption_error,
     make_test_vectors,
+    validate_destructive_binding_flow,
     validate_light_status,
+    validate_light_timeout_off,
     validate_read_all_partial_notifications,
     validate_read_all_notifications,
     validate_read_one_notifications,
@@ -170,6 +172,52 @@ def test_light_status_validation_checks_mode_and_remaining() -> None:
         raise AssertionError("expected SmokeValidationError")
 
 
+def test_light_timeout_validation_requires_off_status() -> None:
+    validate_light_timeout_off(
+        [
+            bytes.fromhex("01 0A 00"),
+            bytes.fromhex("01 01 00"),
+            bytes.fromhex("00 00 00"),
+        ]
+    )
+
+    try:
+        validate_light_timeout_off([bytes.fromhex("01 01 00")])
+    except SmokeValidationError as exc:
+        assert "Light Status timeout OFF" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
+def test_destructive_binding_flow_validation_checks_mutations() -> None:
+    slot1 = expected_slot1_record(qty=12)
+    slot1_qty42 = expected_slot1_record(qty=42)
+    slot2 = bytearray(slot1_qty42)
+    slot2[0] = 2
+    slot2 = bytes(slot2)
+
+    validate_destructive_binding_flow(
+        {
+            "clear": [bytes.fromhex("11 00"), bytes([0x01, 0x00]) + bytes(16)],
+            "insert": [bytes.fromhex("20 00"), bytes([0x01, 0x00]) + slot1],
+            "set_qty": [bytes.fromhex("30 00"), bytes([0x01, 0x00]) + slot1_qty42],
+            "move": [bytes.fromhex("22 00"), bytes([0x01, 0x00]) + bytes(16),
+                     bytes([0x01, 0x00]) + slot2],
+            "remove": [bytes.fromhex("21 00"), bytes([0x01, 0x00]) + slot1_qty42],
+            "factory_reset": [bytes.fromhex("F0 00"), bytes([0x01, 0x00]) + bytes(16)],
+        }
+    )
+
+
+def test_destructive_binding_flow_validation_rejects_missing_phase() -> None:
+    try:
+        validate_destructive_binding_flow({})
+    except SmokeValidationError as exc:
+        assert "destructive phase" in str(exc)
+    else:
+        raise AssertionError("expected SmokeValidationError")
+
+
 def test_status_validation_rejects_missing_status() -> None:
     try:
         validate_status_notification([bytes.fromhex("10 00")], 0x30)
@@ -211,6 +259,9 @@ if __name__ == "__main__":
     test_table_seq_validation_requires_increase()
     test_table_crc_validation_requires_change()
     test_light_status_validation_checks_mode_and_remaining()
+    test_light_timeout_validation_requires_off_status()
+    test_destructive_binding_flow_validation_checks_mutations()
+    test_destructive_binding_flow_validation_rejects_missing_phase()
     test_status_validation_rejects_missing_status()
     test_explains_corebluetooth_unsupported_error()
     test_detects_corebluetooth_encryption_errors()

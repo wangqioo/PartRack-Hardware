@@ -179,13 +179,14 @@ APP 连接设备后建议按这个顺序执行：
 ```text
 1. connectGatt()
 2. discoverServices()
-3. 找到 Binding Table Service 和 Light Control Service
+3. 找到 Binding Table Service、Light Control Service 和 Device Health Service
 4. 读取 Table Info
 5. 开启 Binding Control Point notify
 6. 开启 Table Info notify
 7. 开启 Light Status notify
-8. 发送 READ_ALL，同步硬件绑定表
-9. 根据 table_seq 和 crc16 更新 APP 本地缓存状态
+8. 读取 Device Health
+9. 发送 READ_ALL，同步硬件绑定表
+10. 根据 table_seq 和 crc16 更新 APP 本地缓存状态
 ```
 
 如果只做最小联调，可以先执行：
@@ -193,6 +194,39 @@ APP 连接设备后建议按这个顺序执行：
 ```text
 连接 -> discoverServices -> 读取 Table Info -> 开启 Binding CP notify -> WRITE_ONE -> READ_ONE
 ```
+
+### Device Health Service
+
+```text
+Service UUID:
+7f4b0003-8d1a-4d45-9a4e-2b4a7c000000
+```
+
+| Characteristic | UUID | 属性 | 用途 |
+|---|---|---|---|
+| Device Health | `7f4b3001-8d1a-4d45-9a4e-2b4a7c000000` | Read, Notify | 电量、复位原因、看门狗/故障状态 |
+
+Device Health 固定 4 字节：
+
+| 偏移 | 长度 | 字段 | 说明 |
+|---|---:|---|---|
+| 0 | 1 | `battery_pct` | 0-100；当前 XIAO 裸板无电池 ADC alias 时返回 100 |
+| 1 | 2 | `reset_reason` | 小端 bitmask |
+| 3 | 1 | `health_flags` | bit0 watchdog enabled，bit1 fault |
+
+`reset_reason` bitmask：
+
+| Bit | 含义 |
+|---:|---|
+| 0 | 上电复位 |
+| 1 | Reset pin |
+| 2 | 软件复位 |
+| 3 | 看门狗复位 |
+| 4 | CPU lockup |
+| 5 | 低功耗/关机唤醒 |
+| 15 | 其他平台原因 |
+
+APP 建议连接后读取一次 Device Health，用于调试“为什么设备重启”和“电池显示”。当前 notify 属性已预留，但开发期先按 read-first 接入；等电池周期采样策略冻结后再依赖 notify 做 UI 实时刷新。
 
 ## Table Info 格式
 

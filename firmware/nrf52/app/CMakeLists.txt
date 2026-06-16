@@ -12,12 +12,14 @@ target_sources(app PRIVATE
   src/main.c
   src/app_ble.c
   src/binding_table.c
+  src/device_health.c
   src/light_control.c
   src/nfc_wake.c
   ../../../protocol/viberack_adv_payload.c
   ../../../protocol/viberack_ble_dispatcher_model.c
   ../../../protocol/viberack_ble_lifecycle.c
   ../../../protocol/viberack_binding_table_model.c
+  ../../../protocol/viberack_device_health.c
   ../../../protocol/viberack_light_frame.c
   ../../../protocol/viberack_light_policy.c
   ../../../protocol/viberack_light_state.c

@@ -153,6 +153,50 @@ def validate_light_status(data: bytes, expected_mode: int, min_remaining: int | 
         )
 
 
+def validate_light_timeout_off(samples: list[bytes]) -> None:
+    for sample in samples:
+        try:
+            validate_light_status(sample, expected_mode=0)
+            return
+        except SmokeValidationError:
+            continue
+
+    observed = ", ".join(hex_bytes(data) for data in samples) or "<none>"
+    raise SmokeValidationError(f"Light Status timeout OFF was not observed; observed: {observed}")
+
+
+def _record_for_slot(slot: int, qty: int = 12) -> bytes:
+    record = bytearray(expected_slot1_record(qty=qty))
+    record[0] = slot
+    return bytes(record)
+
+
+def validate_destructive_binding_flow(phase_notifications: dict[str, list[bytes]]) -> None:
+    required_phases = ("clear", "insert", "set_qty", "move", "remove", "factory_reset")
+    for phase in required_phases:
+        if phase not in phase_notifications:
+            raise SmokeValidationError(f"destructive phase missing: {phase}")
+
+    validate_status_notification(phase_notifications["clear"], 0x11)
+    validate_read_one_notifications(phase_notifications["clear"], bytes(16))
+
+    validate_status_notification(phase_notifications["insert"], 0x20)
+    validate_read_one_notifications(phase_notifications["insert"], expected_slot1_record())
+
+    validate_status_notification(phase_notifications["set_qty"], 0x30)
+    validate_read_one_notifications(phase_notifications["set_qty"], expected_slot1_record(qty=42))
+
+    validate_status_notification(phase_notifications["move"], 0x22)
+    validate_read_one_notifications(phase_notifications["move"], bytes(16))
+    validate_read_one_notifications(phase_notifications["move"], _record_for_slot(2, qty=42))
+
+    validate_status_notification(phase_notifications["remove"], 0x21)
+    validate_read_one_notifications(phase_notifications["remove"], expected_slot1_record(qty=42))
+
+    validate_status_notification(phase_notifications["factory_reset"], 0xF0)
+    validate_read_one_notifications(phase_notifications["factory_reset"], bytes(16))
+
+
 def explain_ble_backend_error(exc: BaseException) -> str:
     message = str(exc)
     if "BLE is unsupported" in message:
@@ -197,6 +241,20 @@ async def wait_for_read_all_end(notifications: list[bytes], timeout_s: float = 5
         if expected_end in notifications:
             return
         await asyncio.sleep(0.05)
+
+
+async def wait_for_light_timeout_off(client, timeout_s: float = 12.0) -> list[bytes]:
+    samples: list[bytes] = []
+    deadline = asyncio.get_running_loop().time() + timeout_s
+
+    while asyncio.get_running_loop().time() < deadline:
+        sample = bytes(await client.read_gatt_char(LIGHT_STATUS_UUID))
+        samples.append(sample)
+        if sample == bytes.fromhex("00 00 00"):
+            return samples
+        await asyncio.sleep(0.25)
+
+    return samples
 
 
 async def find_device(device_name: str):
@@ -379,6 +437,104 @@ async def run_persistence_read(device_name: str) -> None:
         await client.stop_notify(BINDING_CP_UUID)
 
 
+async def run_destructive_binding(device_name: str) -> None:
+    try:
+        from bleak import BleakClient
+    except ImportError as exc:
+        raise SystemExit(
+            "bleak is required for --run-destructive-binding: python3 -m pip install bleak"
+        ) from exc
+
+    device = await find_device(device_name)
+    notifications: list[bytes] = []
+    on_binding_notify = make_binding_notify_collector(notifications)
+    phases: dict[str, list[bytes]] = {}
+
+    async with BleakClient(device) as client:
+        await client.start_notify(BINDING_CP_UUID, on_binding_notify)
+        vectors = make_test_vectors()
+
+        notifications.clear()
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["write_slot1"])
+        await asyncio.sleep(0.2)
+        validate_status_notification(notifications, 0x10)
+
+        notifications.clear()
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["clear_slot1"])
+        await asyncio.sleep(0.2)
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["read_slot1"])
+        await asyncio.sleep(0.5)
+        phases["clear"] = list(notifications)
+
+        notifications.clear()
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["insert_slot1"])
+        await asyncio.sleep(0.2)
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["read_slot1"])
+        await asyncio.sleep(0.5)
+        phases["insert"] = list(notifications)
+
+        notifications.clear()
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["set_slot1_qty_42"])
+        await asyncio.sleep(0.2)
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["read_slot1"])
+        await asyncio.sleep(0.5)
+        phases["set_qty"] = list(notifications)
+
+        notifications.clear()
+        await write_gatt_char_with_pairing_retry(
+            client, BINDING_CP_UUID, vectors["move_slot1_to_2_len_1"]
+        )
+        await asyncio.sleep(0.2)
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["read_slot1"])
+        await asyncio.sleep(0.2)
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, bytes([0x01, 0x02]))
+        await asyncio.sleep(0.5)
+        phases["move"] = list(notifications)
+
+        notifications.clear()
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["remove_slot1"])
+        await asyncio.sleep(0.2)
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["read_slot1"])
+        await asyncio.sleep(0.5)
+        phases["remove"] = list(notifications)
+
+        notifications.clear()
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["factory_reset"])
+        await asyncio.sleep(0.5)
+        await write_gatt_char_with_pairing_retry(client, BINDING_CP_UUID, vectors["read_slot1"])
+        await asyncio.sleep(0.5)
+        phases["factory_reset"] = list(notifications)
+
+        validate_destructive_binding_flow(phases)
+        await client.stop_notify(BINDING_CP_UUID)
+
+
+async def run_light_timeout(device_name: str) -> None:
+    try:
+        from bleak import BleakClient
+    except ImportError as exc:
+        raise SystemExit(
+            "bleak is required for --run-light-timeout: python3 -m pip install bleak"
+        ) from exc
+
+    device = await find_device(device_name)
+
+    async with BleakClient(device) as client:
+        vectors = make_test_vectors()
+        await client.write_gatt_char(
+            LIGHT_COMMAND_UUID, vectors["light_find_slot1_red_10s"], response=False
+        )
+        await asyncio.sleep(0.2)
+        active = bytes(await client.read_gatt_char(LIGHT_STATUS_UUID))
+        print(f"light_status_timeout_start: {hex_bytes(active)}")
+        validate_light_status(active, expected_mode=1, min_remaining=1)
+
+        samples = await wait_for_light_timeout_off(client)
+        for sample in samples:
+            print(f"light_status_timeout_sample: {hex_bytes(sample)}")
+        validate_light_timeout_off(samples)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="PartRack BLE GATT smoke helper")
     parser.add_argument("--device-name", default=DEVICE_NAME)
@@ -386,6 +542,8 @@ def main() -> int:
     parser.add_argument("--run-smoke", action="store_true")
     parser.add_argument("--run-batch", action="store_true")
     parser.add_argument("--run-persistence-read", action="store_true")
+    parser.add_argument("--run-destructive-binding", action="store_true")
+    parser.add_argument("--run-light-timeout", action="store_true")
     parser.add_argument(
         "--include-destructive",
         action="store_true",
@@ -393,7 +551,15 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if args.print_vectors or not (args.run_smoke or args.run_batch or args.run_persistence_read):
+    requested_run = (
+        args.run_smoke
+        or args.run_batch
+        or args.run_persistence_read
+        or args.run_destructive_binding
+        or args.run_light_timeout
+    )
+
+    if args.print_vectors or not requested_run:
         print_test_vectors()
 
     if args.run_smoke:
@@ -402,6 +568,10 @@ def main() -> int:
         asyncio.run(run_batch(args.device_name))
     if args.run_persistence_read:
         asyncio.run(run_persistence_read(args.device_name))
+    if args.run_destructive_binding:
+        asyncio.run(run_destructive_binding(args.device_name))
+    if args.run_light_timeout:
+        asyncio.run(run_light_timeout(args.device_name))
 
     return 0
 

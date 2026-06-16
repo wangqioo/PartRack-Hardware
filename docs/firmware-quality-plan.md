@@ -11,6 +11,7 @@
 | `tools/protocol_check.py` | CRC8、slot mask、16B 槽位记录、17B 灯控帧 |
 | `tools/storage_snapshot_test.c` | snapshot magic、version、CRC、损坏拒绝 |
 | `tools/adv_payload_test.c` | 广播 manufacturer data 的 company id、proto_ver、battery、status flags、`table_seq` 低 16 位 |
+| `tools/device_health_test.c` | 电池百分比换算、Device Health 4B payload、reset reason 小端编码、watchdog/fault flags |
 | `tools/binding_table_core_test.c` | 绑定表 write/read/clear/insert/remove/move/set qty/factory reset、`table_seq`、CRC 拒绝、保存失败原子性 |
 | `tools/ble_dispatcher_model_test.c` | Binding Control Point opcode 长度、状态码、notify payload、`READ_ALL` end marker、Table Info notify |
 | `tools/ble_lifecycle_test.c` | BLE lifecycle 状态、广播 dirty/coalesce、connected/deconnected 行为、notify 在线规则 |
@@ -22,7 +23,7 @@
 
 | 文件 | 覆盖 |
 |---|---|
-| `tools/ble_gatt_smoke_test_test.py` | BLE smoke 脚本测试向量和 notify 校验，不代表真实 BLE 通过 |
+| `tools/ble_gatt_smoke_test_test.py` | BLE smoke 脚本测试向量、破坏性绑定表流程校验、灯控超时 OFF 校验和 notify 校验，不代表真实 BLE 通过 |
 | `tools/binding_table_model_test.py` | `MOVE_BLOCK` Python 模型 |
 
 ## 下一批 host/model 验证
@@ -42,7 +43,7 @@
 - `WRITE_ONE -> 重启 -> READ_ONE` settings/NVS 持久化闭环。
 - 真实 WS2812 颜色、槽位、SPI 时序、P-MOS 上下电和电流。
 - NT3H2111 I2C、NDEF URI、FD 唤醒和快速广播。
-- 电池 ADC 标定和低功耗。
+- Device Health 真实 BLE 读取、复位原因实机样本、看门狗复位闭环、电池 ADC 标定和低功耗。
 - nRF52832 目标板资源、引脚和功耗预算。
 
 ## 证据标签

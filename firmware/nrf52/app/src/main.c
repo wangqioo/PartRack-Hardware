@@ -6,6 +6,7 @@
 
 #include "app_ble.h"
 #include "binding_table.h"
+#include "device_health.h"
 #include "light_control.h"
 #include "nfc_wake.h"
 
@@ -89,6 +90,11 @@ int main(void)
         return err;
     }
 
+    err = device_health_init();
+    if (err != 0) {
+        LOG_WRN("device health init failed: %d", err);
+    }
+
     err = nfc_wake_init();
     if (err != 0) {
         LOG_WRN("nfc wake init failed: %d", err);
@@ -118,6 +124,8 @@ int main(void)
     LOG_INF("PartRack firmware ready");
 
     while (true) {
+        device_health_feed_watchdog();
+
         if (ble_connected) {
             status_led_set(&led_green, false);
             status_led_set(&led_blue, true);

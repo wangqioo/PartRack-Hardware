@@ -57,6 +57,11 @@ run_host_checks() {
   /tmp/adv_payload_test
 
   cc -std=c11 -Wall -Wextra -Iprotocol \
+    tools/device_health_test.c protocol/viberack_device_health.c \
+    -o /tmp/device_health_test
+  /tmp/device_health_test
+
+  cc -std=c11 -Wall -Wextra -Iprotocol \
     tools/binding_table_core_test.c protocol/viberack_protocol.c protocol/viberack_binding_table_model.c \
     -o /tmp/binding_table_core_test
   /tmp/binding_table_core_test

@@ -14,10 +14,12 @@
 #include <zephyr/sys/byteorder.h>
 
 #include "binding_table.h"
+#include "device_health.h"
 #include "light_control.h"
 #include "viberack_adv_payload.h"
 #include "viberack_ble_dispatcher_model.h"
 #include "viberack_ble_lifecycle.h"
+#include "viberack_device_health.h"
 #include "viberack_read_all_pacer.h"
 
 LOG_MODULE_REGISTER(app_ble, LOG_LEVEL_INF);
@@ -31,9 +33,10 @@ void app_status_set_ble_connected(bool connected);
 #define VBRK_BT_UUID_LIGHT_SERVICE BT_UUID_128_ENCODE(0x7f4b0002, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
 #define VBRK_BT_UUID_LIGHT_COMMAND BT_UUID_128_ENCODE(0x7f4b2001, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
 #define VBRK_BT_UUID_LIGHT_STATUS BT_UUID_128_ENCODE(0x7f4b2002, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
+#define VBRK_BT_UUID_HEALTH_SERVICE BT_UUID_128_ENCODE(0x7f4b0003, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
+#define VBRK_BT_UUID_DEVICE_HEALTH BT_UUID_128_ENCODE(0x7f4b3001, 0x8d1a, 0x4d45, 0x9a4e, 0x2b4a7c000000)
 
 static struct bt_conn *current_conn;
-static uint8_t battery_pct = 100;
 static vbrk_ble_lifecycle_t ble_lifecycle;
 static struct k_work ble_lifecycle_work;
 static vbrk_read_all_pacer_t read_all_pacer;
@@ -45,6 +48,8 @@ static struct bt_uuid_128 table_info_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_TABLE_
 static struct bt_uuid_128 light_service_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_LIGHT_SERVICE);
 static struct bt_uuid_128 light_command_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_LIGHT_COMMAND);
 static struct bt_uuid_128 light_status_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_LIGHT_STATUS);
+static struct bt_uuid_128 health_service_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_HEALTH_SERVICE);
+static struct bt_uuid_128 device_health_uuid = BT_UUID_INIT_128(VBRK_BT_UUID_DEVICE_HEALTH);
 
 static uint8_t adv_msd[VBRK_ADV_MSD_SIZE];
 
@@ -83,11 +88,11 @@ static void fill_adv_msd(void)
     vbrk_adv_payload_input_t input = {
         .company_id = VBRK_DEV_COMPANY_ID,
         .batch_id = 1,
-        .battery_pct = battery_pct,
+        .battery_pct = device_health_battery_pct(),
         .table_seq = binding_table_seq(),
         .has_unbound_slot = binding_table_has_unbound_slot(),
         .light_active = light_control_mode() != VBRK_LIGHT_OFF,
-        .fault = false,
+        .fault = device_health_fault(),
     };
 
     vbrk_adv_payload_build(adv_msd, &input);
@@ -136,6 +141,20 @@ static ssize_t light_status_read(struct bt_conn *conn, const struct bt_gatt_attr
     sys_put_le16(light_control_remaining_s(), &status[1]);
 
     return bt_gatt_attr_read(conn, attr, buf, len, offset, status, sizeof(status));
+}
+
+static ssize_t device_health_read(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+                                  void *buf, uint16_t len, uint16_t offset)
+{
+    uint8_t payload[VBRK_DEVICE_HEALTH_SIZE];
+    vbrk_device_health_t health;
+
+    ARG_UNUSED(attr);
+
+    device_health_get(&health);
+    vbrk_device_health_encode(payload, &health);
+
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, payload, sizeof(payload));
 }
 
 static int dispatcher_read_one(uint8_t slot, vbrk_slot_record_t *record, void *user_data)
@@ -308,6 +327,15 @@ BT_GATT_SERVICE_DEFINE(light_svc,
                            BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
                            BT_GATT_PERM_READ,
                            light_status_read, NULL, NULL),
+    BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)
+);
+
+BT_GATT_SERVICE_DEFINE(health_svc,
+    BT_GATT_PRIMARY_SERVICE(&health_service_uuid.uuid),
+    BT_GATT_CHARACTERISTIC(&device_health_uuid.uuid,
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_READ,
+                           device_health_read, NULL, NULL),
     BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)
 );
 

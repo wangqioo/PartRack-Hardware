@@ -111,3 +111,37 @@ op(1B) + status(1B) + payload
 | `0x03` | `SORT` |
 | `0x04` | `STOCK_IN` |
 | `0x05` | `FX` |
+
+## Device Health Service
+
+Service UUID：
+
+```text
+7f4b0003-8d1a-4d45-9a4e-2b4a7c000000
+```
+
+| Characteristic | UUID | 属性 | 用途 |
+|---|---|---|---|
+| Device Health | `7f4b3001-8d1a-4d45-9a4e-2b4a7c000000` | Read, Notify | 电量、复位原因和健康状态 |
+
+Device Health payload 固定 4 字节：
+
+| 偏移 | 长度 | 字段 | 说明 |
+|---|---:|---|---|
+| 0 | 1 | `battery_pct` | 0-100；没有电池 ADC alias 时开发板返回 100 |
+| 1 | 2 | `reset_reason` | 小端 bitmask |
+| 3 | 1 | `health_flags` | bit0 看门狗已启用，bit1 健康状态故障 |
+
+`reset_reason` bit：
+
+| Bit | 含义 |
+|---:|---|
+| 0 | power-on |
+| 1 | reset pin |
+| 2 | software reset |
+| 3 | watchdog |
+| 4 | CPU lockup |
+| 5 | low-power/off wake |
+| 15 | other/unknown platform reason |
+
+当前固件启动时读取并清除 Zephyr `hwinfo` reset cause，后续 APP 通过 Device Health 读取的是本次启动捕获值。看门狗驱动已编入，真正启用仍受固件配置开关控制。
