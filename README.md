@@ -20,6 +20,10 @@ https://github.com/Yrd980/LCSC_android_erp.git
 - Light Command / Light Status、10s 超时自动 OFF 已实机通过。
 - Device Health Service 已实机读取，样例 payload：`64 02 00 00`。
 - 本机 host/model 测试和 XIAO bare/peripheral Zephyr build 已纳入 `tools/verify_host.sh`。
+- 当前已给软件侧烧录 peripheral 完整版 XIAO UF2：
+  `/Users/wq/ncs/build-partrack-PartRack-Hardware-xiao-sense-peripherals/app/zephyr/zephyr.uf2`
+- 当前 peripheral UF2 SHA-256：
+  `25514abd08d93a7154a704e4b9a151acb4f7823dca6617c8cb043741ea972689`
 
 当前阶段已经进入：
 
@@ -28,6 +32,29 @@ https://github.com/Yrd980/LCSC_android_erp.git
 3. 真实 WS2812 灯条、电源门控、NFC 和 nRF52832 目标板验证。
 
 注意：XIAO nRF52840 Sense 的实机证据不能自动外推为 nRF52832 目标板或量产硬件证据。
+
+## 软件侧交接
+
+软件/Android 同学现在可以基于已烧录的 `VBRK-0000` 设备继续开发 BLE Central 逻辑。
+
+优先测试：
+
+1. 扫描并连接 `VBRK-0000`。
+2. `discoverServices()` 后确认 Binding Table、Light Control、Device Health 三个 service。
+3. 处理 Binding Control Point encrypted write 的配对/加密重试。
+4. 开启 Binding CP notify，跑 `WRITE_ONE -> READ_ONE`。
+5. 执行 `READ_ALL`，等待 `02 00 FF` 结束帧。
+6. 执行 `SET_QTY`，确认 notify 和 `Table Info.table_seq` 变化。
+7. 下发 Light Command，读取或订阅 `Light Status`。
+8. 读取 Device Health，当前实测样例 `64 02 00 00`。
+
+暂时不要依赖：
+
+- NFC URI / NT3H2111 NDEF。
+- OTA / Secure DFU。
+- 真实电池 ADC 百分比。
+- 未接灯条时的真实 WS2812 槽位颜色。
+- 未进入测试窗口时的破坏性绑定表命令。
 
 ## 项目范围
 
