@@ -28,7 +28,7 @@
 | `MOVE_BLOCK` | 块移动已实现。 | host/model 已覆盖基础操作。 | 准备多条记录后执行 `MOVE_BLOCK`，再 `READ_ALL`。 | 槽位顺序符合协议，未影响块外数据。 |
 | `FACTORY_RESET` | 全表清空命令已实现。 | host/model 和 smoke vectors 已覆盖。 | 破坏性测试窗口内写 `F0 A5 A5 5A 5A`。 | 全部槽位为空，Table Info 回到空表状态。 |
 | settings/NVS 持久化 | `vbrk/binding_table` snapshot、magic/version/CRC16、损坏拒绝已实现。 | `tools/storage_snapshot_test.c` host verified；2026-06-16 XIAO 单击 reset 后 `READ_ONE slot 1` 读回 `C1234567 / qty=42`。 | 多槽、移动/删除/清空类操作后重启恢复；APP/nRF52832 复验。 | 重启后读回对应记录，`table_seq` 不回退。 |
-| BLE 加密/配对 | Binding Control Point 配置为 encrypted write；固件连接后请求 `BT_SECURITY_L2`；开发期支持 4 个 paired peers。 | 2026-06-16 串口记录 `security changed: level 2`，Mac 自动烟测 encrypted write 通过。 | APP 侧实现 authentication/encryption retry，并在 Android 真机复验。 | 配对后写入成功；APP 侧可据此实现 authentication/encryption retry。 |
+| BLE 加密/配对 | Binding Control Point 配置为 encrypted write；固件连接后请求 `BT_SECURITY_L2`；开发期支持 10 个 paired peers，超出后覆盖最旧 key。 | 2026-06-16 串口记录 `security changed: level 2`，Mac 自动烟测 encrypted write 通过。 | APP 侧实现 authentication/encryption retry，并在 Android 真机复验；量产前重新决定主手机/维修设备/解绑策略。 | 配对后写入成功；APP 侧可据此实现 authentication/encryption retry。 |
 | Light Status 读取 | `mode + remaining_s` 特征已实现。 | 历史空闲返回 `0000 00`；2026-06-16 Mac 批量验证 `FIND` 后返回 `01 0A 00`，OFF 后返回 `00 00 00`。 | APP 侧订阅 notify；真实灯条和超时自动 OFF 复验。 | OFF 时返回 `0000 00`；灯控命令后 mode/remaining_s 变化。 |
 | Light Command | `FIND/PICK/SORT/STOCK_IN/OFF` 命令解析和状态框架已实现。 | 2026-06-16 XIAO bare 固件无外接灯条状态闭环通过：FIND 后 Light Status 进入 mode 1，OFF 后回 mode 0。 | 验证超时自动 OFF；接真实灯条验证颜色和槽位；APP/nRF52832 复验。 | Light Status 进入对应 mode，超时后回到 OFF；真实灯条按槽位亮灭。 |
 | 灯条电源门控 | D3/P0.29 高电平上电，OFF/超时断电。 | 代码和 build 存在；裸 variant 当前不加载外设 alias。 | 烧录 peripheral build，万用表测 D3/P0.29。 | 非 OFF 命令拉高，OFF 或超时后拉低。 |

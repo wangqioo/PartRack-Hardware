@@ -325,14 +325,14 @@ BLE backend is unavailable: CoreBluetooth reported 'BLE is unsupported'. This us
 
 ## 2026-06-16 M0 BLE smoke、配对和 READ_ALL pacing 记录
 
-2026-06-16 已将开发期配对容量从 1 个 peer 扩到 4 个 peer，并启用 key 满时覆盖最旧记录：
+2026-06-16 已将开发期配对容量从 1 个 peer 扩到 10 个 peer，并启用 key 满时覆盖最旧记录：
 
 ```text
-CONFIG_BT_MAX_PAIRED=4
+CONFIG_BT_MAX_PAIRED=10
 CONFIG_BT_KEYS_OVERWRITE_OLDEST=y
 ```
 
-原因：手机 nRF Connect 已可能占用唯一 pairing key 槽，Mac 端自动烟测作为第二个 peer 连接时，`bt_conn_set_security(conn, BT_SECURITY_L2)` 在固件串口中返回 `-12`。扩大 key 槽后，串口确认：
+原因：手机 nRF Connect 已可能占用唯一 pairing key 槽，Mac 端自动烟测作为第二个 peer 连接时，`bt_conn_set_security(conn, BT_SECURITY_L2)` 在固件串口中返回 `-12`。开发期需要手机、Mac、备用手机、备用电脑等多端轮换测试，4 个 peer 仍偏紧；10 个 peer 是开发期配置，不代表量产策略。扩大 key 槽后，串口确认：
 
 ```text
 app_ble: security changed: level 2
@@ -467,7 +467,7 @@ binding_notify: 01 00 01 43 31 32 33 34 35 36 37 00 00 2A 00 00 00 61
 - `BT_GATT_PERM_WRITE_ENCRYPT` 只声明 Binding Control Point 写入需要加密，不保证客户端会主动发起配对。固件连接成功后需要调用 `bt_conn_set_security(conn, BT_SECURITY_L2)`，主动要求链路进入加密状态。
 - “能连接、能读”不等于“能写”。`Table Info` 和 `Light Status` 是普通 read，未加密也能成功；Binding Control Point 是 encrypted write，未完成加密时会被 macOS 拒绝。
 - macOS / Bleak 不能可靠显式 pair。CoreBluetooth 通常只在外设或受保护 characteristic 触发安全流程时弹系统提醒；脚本侧需要识别 `Encryption is insufficient` / `Authentication is insufficient`，等待系统完成配对后重试。
-- `CONFIG_BT_MAX_PAIRED=1` 在开发期太小。手机 nRF Connect 可能已经占用唯一 pairing key 槽，Mac 作为第二个 peer 请求配对时，固件 `bt_conn_set_security()` 返回 `-12`。开发期使用 `CONFIG_BT_MAX_PAIRED=4` 并启用 `CONFIG_BT_KEYS_OVERWRITE_OLDEST=y`，避免多个测试客户端互相卡住。
+- `CONFIG_BT_MAX_PAIRED=1` 在开发期太小。手机 nRF Connect 可能已经占用唯一 pairing key 槽，Mac 作为第二个 peer 请求配对时，固件 `bt_conn_set_security()` 返回 `-12`。开发期使用 `CONFIG_BT_MAX_PAIRED=10` 并启用 `CONFIG_BT_KEYS_OVERWRITE_OLDEST=y`，避免多个测试客户端互相卡住；量产时需要重新决定主手机、维修设备和解绑策略。
 - 串口日志是判断配对是否真的成功的关键证据。成功标志是 `security changed: level 2`；失败标志之一是 `failed to request encrypted link: -12`。
 - 真实 BLE notify 时序不能用 host/model 结果外推。`READ_ALL` 模型里能连续发 25 条记录和结束帧，但真实 BLE TX 队列会限制连续 notify；固件侧应使用 paced/asynchronous notify，并处理 notify busy 后的重试。
 
