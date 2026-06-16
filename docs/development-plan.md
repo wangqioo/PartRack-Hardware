@@ -16,6 +16,12 @@
 
 ## 当前进度快照
 
+阶段状态（2026-06-16）：
+
+- M0 在 XIAO nRF52840 Sense + Mac CoreBluetooth/Bleak 范围内已经基本打通：扫描、连接、service discovery、Table Info、绑定表读写、`READ_ALL`、`SET_QTY`、settings/NVS 单槽重启恢复、Light Command/Light Status、10s 超时 OFF 和 Device Health 读取均已形成实机证据。
+- 当前正式进入“破坏性绑定表验证 + APP 联调 + 真实外设验证”阶段。后续所有结论仍以 [verification-matrix.md](verification-matrix.md) 为准，XIAO 证据不能自动外推为 nRF52832 目标板或量产硬件证据。
+- 下一批最高优先级工作是：先跑破坏性绑定表实机闭环，再补 Android APP 最小闭环，然后接真实灯条/NFC/目标板做外设和资源验证。
+
 已完成：
 
 - 仓库已同步到 GitHub：`wangqioo/PartRack-Hardware`。
@@ -90,7 +96,7 @@
 | P0 | APP 侧 BLE 联调 | 固件侧 Mac/Bleak 已通过；APP 仓库独立维护。 | Android 实现或复验扫描、连接、service discovery、encrypted write retry、Binding CP notify、`READ_ALL` 结束帧、断开重连。 | APP 能完成最小闭环：写 slot1、读回、全表同步、改数量、灯控状态读取；遇到配对/加密错误可重试。 | 需要 Android 真机和 `Yrd980/LCSC_android_erp` 仓库配合。 |
 | P1 | 灯条电源门控实测 | D3/P0.29 P-MOS 控制代码和 peripheral build 已存在。 | 烧录 peripheral UF2，万用表/逻辑分析仪测 D3/P0.29：FIND/PICK/STOCK_IN 拉高，OFF/超时拉低。 | 非 OFF 后电源控制拉高；OFF 和超时后拉低；无外设 alias 的 bare build 不受影响。 | 需要接线或至少测开发板引脚。 |
 | P1 | 真实 WS2812 灯条验证 | 25 槽 frame、GRB、SPI backend 已实现并 build verified。 | 接 25 颗 WS2812：D2 -> DIN，D3 -> 电源门控，GND 共地；发送单槽、多槽、A/B 重叠、OFF、超时命令。 | 槽位 1-25 对应正确；颜色正确；B 覆盖 A；OFF/超时熄灯；供电无异常。 | 需要真实灯条和合适供电。 |
-| P1 | Light Status notify 和超时自动 OFF | 读取状态已通过；notify/超时路径未形成实机证据。 | 订阅 Light Status notify，发送 FIND 10s，观察 notify 和 10s 后 OFF。 | 收到 mode 1/remaining 更新；超时后回 `00 00 00`。 | 可先无灯条验证，再接真实灯条复验。 |
+| P1 | Light Status notify 和真实灯条超时复验 | 读取状态和 10s 超时自动 OFF 已在 XIAO/Mac 裸板 BLE 路径通过；Light Status notify 和真实灯条物理熄灯仍缺证据。 | 订阅 Light Status notify，发送 FIND 10s；接真实灯条后观察 10s 后物理熄灯。 | 收到 mode 1/remaining 更新；超时后回 `00 00 00`；真实灯条随状态熄灭。 | 裸板状态闭环已通过，剩余是 APP notify 和外设复验。 |
 | P2 | NFC FD + NT3H2111 I2C/NDEF | FD GPIO 入口已实现；I2C/NDEF 尚未接入。 | 接 NT3H2111，确认 I2C 地址和引脚，读取 tag memory，写入 `lcscerp://device?...` URI，验证手机触碰路由。 | 触碰触发 FD 唤醒/快速广播；手机可读 NDEF URI 并路由 APP。 | 需要 NT3H2111 硬件和手机 NFC。 |
 | P2 | Device Health / 电池 ADC / 复位原因 | Device Health BLE service、reset reason 捕获、ADC 软件入口已接入；当前 XIAO 无电池 ADC alias。 | 读取 Device Health；目标板分压方案回来后添加 `vbrk-battery-adc` alias，按 XIAO/目标板注意事项处理 ADC 量程和校准。 | payload 4B 正确；电压读数单调、范围合理；低电量 flag 可触发；复位原因可区分上电/reset/software/watchdog。 | 目标板分压方案回来后需复验。 |
 | P2 | 低功耗测量 | 未形成实测数据。 | 定义并实测广播、连接、灯条关闭、单槽/多槽/25 槽点亮电流。 | 电流数据进入验证矩阵；不达标项形成硬件/固件优化任务。 | 需要电源表或电流测量夹具。 |
@@ -104,7 +110,7 @@
 2. 烧录灯条电源门控固件，验证 D3/P0.29 会随灯控命令拉高/拉低。
 3. 用 APP 侧复验配对/加密重试、`READ_ALL` 结束帧处理和断开重连。
 4. 接真实 25 颗 WS2812 灯条，验证 `FIND/PICK/SORT/STOCK_IN/OFF` 的颜色、槽位和超时熄灯。
-5. 读取 Device Health，补 reset reason 实机样本。
+5. 用 Device Health 补 reset reason 多类型实机样本：上电、reset pin、software reset、watchdog reset。
 6. 接入 NT3H2111 I2C / NDEF / FD 唤醒。
 7. 回到 nRF52832 目标资源预算和硬件约束验证。
 

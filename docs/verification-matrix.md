@@ -53,7 +53,7 @@
 
 | Gate | 验收口径 | 当前状态 |
 |---|---|---|
-| M0 | 无 NFC 前提下完成扫描、连接、Table Info、绑定表读写、灯控状态。 | 基本通过于 XIAO：扫描、连接、service discovery、Table Info、Light Status、encrypted `WRITE_ONE -> READ_ONE`、`READ_ALL` 结束帧、`SET_QTY` 读回、settings/NVS 单槽重启恢复和 Light Command 状态闭环已在 XIAO 实机通过；真实灯条电源门控、超时自动 OFF、APP 和 nRF52832 目标板仍需复验。 |
+| M0 | 无 NFC 前提下完成扫描、连接、Table Info、绑定表读写、灯控状态。 | 基本通过于 XIAO：扫描、连接、service discovery、Table Info、Light Status、encrypted `WRITE_ONE -> READ_ONE`、`READ_ALL` 结束帧、`SET_QTY` 读回、settings/NVS 单槽重启恢复、Light Command 状态闭环、10s 超时自动 OFF 和 Device Health 读取已在 XIAO/Mac 实机通过；真实灯条电源门控、APP 和 nRF52832 目标板仍需复验。 |
 | M1 | NFC 触发 APP 定向连接并下发 FIND。 | 未通过：NFC FD、NT3H2111 I2C/NDEF 和 APP URI 路由仍需实机验证。 |
 | M2 | 重启后从硬件恢复 25 槽绑定表。 | 部分通过：XIAO 实机已完成 slot 1 “写入 -> 单击 reset -> 读回”闭环；仍需多槽、移动/删除/清空类操作和 nRF52832 目标板复验。 |
 | v1 | 硬件、APP 契约、固件质量和回板验证完成，OTA DFU release gate 达成。 | 未通过：回板验证、nRF52832 资源/引脚/功耗、真实 WS2812、NFC、电池 ADC、低功耗和 OTA/DFU 仍缺证据。 |
